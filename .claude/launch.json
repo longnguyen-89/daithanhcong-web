@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dtc-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve@14", "project", "-p", "5173", "-L"],
+      "port": 5173
+    }
+  ]
+}
