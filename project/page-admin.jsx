@@ -297,13 +297,26 @@ const AdminOrders = ({ orders, refresh }) => {
   );
 };
 
-const AdminBranches = () => {
+const AdminBranches = ({ openModal }) => {
   const D = window.DTC_DATA;
+  const [, force] = useState(0);
+  const remove = async (s) => {
+    if (!confirm(`Ẩn chi nhánh "${s.name}" khỏi website?`)) return;
+    try {
+      const { error } = await window.dtcDeleteStore(s.id);
+      if (error) throw error;
+      D.stores = D.stores.filter(x => x.id !== s.id);
+      force(x => x + 1);
+    } catch (e) {
+      alert('Lỗi: ' + (e?.message || e));
+    }
+  };
+
   return (
     <div className="page-fade">
       <div className="admin-card" style={{marginBottom: 16}}>
-        <div className="admin-card-head"><h3>7 chi nhánh ĐẠI THÀNH CÔNG</h3>
-          <button className="btn btn-primary"><Icon name="plus" size={14} />Thêm chi nhánh</button>
+        <div className="admin-card-head"><h3>{D.stores.length} chi nhánh ĐẠI THÀNH CÔNG</h3>
+          <button className="btn btn-primary" onClick={()=>openModal('store')}><Icon name="plus" size={14} />Thêm chi nhánh</button>
         </div>
       </div>
       <div className="branch-grid">
@@ -315,16 +328,102 @@ const AdminBranches = () => {
               <div className="b-addr">{s.addr}</div>
               <div className="b-stats">
                 <div className="stat"><strong>{s.staff}</strong>NHÂN VIÊN</div>
-                <div className="stat"><strong>{[14,11,9,7,12,6,8][s.id-1]}</strong>XE BÁN</div>
-                <div className="stat"><strong>{[28,22,19,14,21,11,16][s.id-1]}</strong>ĐƠN/THÁNG</div>
+                <div className="stat"><strong>{s.phone.split(' ').slice(-1)[0]}</strong>HOTLINE</div>
               </div>
             </div>
             <div className="actions">
-              <button><Icon name="edit" size={14} /></button>
-              <button><Icon name="settings" size={14} /></button>
+              <button title="Sửa" onClick={()=>openModal('store', s)}><Icon name="edit" size={14} /></button>
+              <button title="Ẩn" onClick={()=>remove(s)}><Icon name="trash" size={14} /></button>
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+};
+
+const StoreModal = ({ data, close, onSaved }) => {
+  const [form, setForm] = useState({
+    name: data?.name || '',
+    addr: data?.addr || '',
+    phone: data?.phone || '',
+    staff: data?.staff ?? 1,
+    map_x: data?.x ?? 50,
+    map_y: data?.y ?? 50,
+    is_active: true
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const save = async () => {
+    if (busy) return;
+    if (!form.name.trim() || !form.addr.trim() || !form.phone.trim()) {
+      setErr('Tên, địa chỉ và SĐT là bắt buộc'); return;
+    }
+    setBusy(true); setErr('');
+    try {
+      const payload = {
+        name: form.name.trim(),
+        addr: form.addr.trim(),
+        phone: form.phone.trim(),
+        staff: Number(form.staff) || 0,
+        map_x: Number(form.map_x) || 50,
+        map_y: Number(form.map_y) || 50,
+        is_active: true
+      };
+      if (data?.id) {
+        const { error } = await window.dtcUpdateStore(data.id, payload);
+        if (error) throw error;
+      } else {
+        const { error } = await window.dtcCreateStore(payload);
+        if (error) throw error;
+      }
+      if (onSaved) await onSaved();
+      close();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={close}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-head">
+          <h3 style={{fontSize:18, fontFamily:'var(--font-display)'}}>{data?'Chỉnh sửa chi nhánh':'Thêm chi nhánh mới'}</h3>
+          <button onClick={close}><Icon name="close" size={18} /></button>
+        </div>
+        <div className="modal-body">
+          {err && <div style={{padding:'10px 14px', marginBottom:12, background:'rgba(200,16,46,0.1)', color:'var(--crimson)', borderRadius:8, fontSize:13}}>{err}</div>}
+          <div className="form-row full"><div><label className="label">Tên chi nhánh *</label>
+            <input className="input" value={form.name} onChange={e=>upd('name', e.target.value)} placeholder="VD: CN Thuận An" /></div></div>
+          <div className="form-row full"><div><label className="label">Địa chỉ *</label>
+            <input className="input" value={form.addr} onChange={e=>upd('addr', e.target.value)} placeholder="Số nhà, đường, phường, thành phố" /></div></div>
+          <div className="form-row">
+            <div><label className="label">Số điện thoại *</label>
+              <input className="input" value={form.phone} onChange={e=>upd('phone', e.target.value)} placeholder="0274 3 777 888" /></div>
+            <div><label className="label">Số nhân viên</label>
+              <input className="input" type="number" min="0" value={form.staff} onChange={e=>upd('staff', e.target.value)} /></div>
+          </div>
+          <div className="form-row">
+            <div><label className="label">Map X (0-100)</label>
+              <input className="input" type="number" min="0" max="100" value={form.map_x} onChange={e=>upd('map_x', e.target.value)} /></div>
+            <div><label className="label">Map Y (0-100)</label>
+              <input className="input" type="number" min="0" max="100" value={form.map_y} onChange={e=>upd('map_y', e.target.value)} /></div>
+          </div>
+          <div style={{fontSize:11, color:'var(--fg-3)', marginTop:-8, marginBottom:14}}>
+            💡 Map X/Y dùng cho bản đồ minh hoạ ở trang chủ. 0,0 = góc trên trái; 100,100 = góc dưới phải.
+          </div>
+          <div style={{display:'flex', justifyContent:'flex-end', gap:10, marginTop:20, paddingTop:20, borderTop:'1px solid var(--border)'}}>
+            <button className="btn btn-ghost" onClick={close} disabled={busy}>Hủy</button>
+            <button className="btn btn-primary" onClick={save} disabled={busy}>
+              <Icon name={data?'edit':'plus'} size={14} />
+              {busy?'Đang lưu…':(data?'Cập nhật':'Lưu chi nhánh')}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -707,18 +806,22 @@ const AdminPage = ({ setRoute, session, onSignOut }) => {
                 <div style={{fontSize:10, color:'var(--fg-3)', fontFamily:'var(--font-mono)', textTransform:'uppercase'}}>{role}</div>
               </div>
             </div>
-            <button className="icon-btn" onClick={onSignOut} title="Đăng xuất"><Icon name="arrow" size={16} /></button>
+            <button className="btn btn-ghost" onClick={onSignOut} title="Đăng xuất"
+              style={{padding:'8px 14px', fontSize:12, gap:6}}>
+              <Icon name="arrow" size={14} /> Đăng xuất
+            </button>
           </div>
         </div>
         {tab==='dashboard' && <AdminDashboard orders={orders} />}
         {tab==='products' && <AdminProducts openModal={openModal} />}
         {tab==='news' && <AdminNews openModal={openModal} />}
         {tab==='orders' && <AdminOrders orders={orders} refresh={refreshOrders} />}
-        {tab==='branches' && <AdminBranches />}
+        {tab==='branches' && <AdminBranches openModal={openModal} />}
         {tab==='ai' && <window.DTC_AdminAISettings />}
         {tab==='settings' && <window.DTC_AdminSiteInfo />}
         {modal?.type==='product' && <ProductModal data={modal.data} close={close} />}
         {modal?.type==='news' && <NewsModal data={modal.data} close={close} onSaved={()=>window.dtcLoadData()} />}
+        {modal?.type==='store' && <StoreModal data={modal.data} close={close} onSaved={()=>window.dtcLoadData()} />}
       </main>
     </div>
   );

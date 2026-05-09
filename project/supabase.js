@@ -203,6 +203,16 @@ window.dtcSubmitOrder = async function(payload) {
   }]).select().single();
 };
 
+window.dtcCreateStore = async function(fields) {
+  return window.dtcSupabase.from('stores').insert([fields]).select().single();
+};
+window.dtcUpdateStore = async function(id, fields) {
+  return window.dtcSupabase.from('stores').update(fields).eq('id', id).select().single();
+};
+window.dtcDeleteStore = async function(id) {
+  return window.dtcSupabase.from('stores').update({ is_active: false }).eq('id', id);
+};
+
 window.dtcUpdateProduct = async function(id, fields) {
   return window.dtcSupabase.from('products').update(fields).eq('id', id).select().single();
 };

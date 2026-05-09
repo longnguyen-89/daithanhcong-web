@@ -1,22 +1,27 @@
 // === AI Chat / Floating widgets / Tweaks ===
 const { Icon } = window.DTC_Components;
 
-const FloatingWidgets = ({ openChat, lang }) => (
+const FloatingWidgets = ({ openChat, lang }) => {
+  const brand = (window.DTC_SETTINGS && window.DTC_SETTINGS.brand_info) || {};
+  const hotline = brand.hotline || '1900 6789';
+  const telHref = 'tel:' + hotline.replace(/\s/g, '');
+  return (
   <div className="floating-stack">
     <a className="float-btn zalo" href="#" onClick={(e)=>e.preventDefault()} title="Zalo">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 5.93 2 10.78c0 2.78 1.5 5.25 3.84 6.86-.16.6-.55 2.06-.62 2.39-.1.42.15.42.32.31.13-.09 2.05-1.4 2.88-1.96.84.21 1.7.32 2.58.32 5.52 0 10-3.93 10-8.78S17.52 2 12 2z"/></svg>
       <span className="float-label">Chat Zalo OA</span>
     </a>
-    <a className="float-btn phone" href="tel:19006789" title="Hotline">
+    <a className="float-btn phone" href={telHref} title={'Hotline ' + hotline}>
       <Icon name="phone" size={22} />
-      <span className="float-label">Hotline 1900 6789</span>
+      <span className="float-label">Hotline {hotline}</span>
     </a>
     <button className="float-btn ai" onClick={openChat} title="AI Tư vấn">
       <Icon name="chat" size={22} />
       <span className="float-label">{lang==='vi'?'Tư vấn AI 24/7':'AI Assistant'}</span>
     </button>
   </div>
-);
+  );
+};
 
 const AIChat = ({ close, lang }) => {
   const aiCfg = (window.DTC_SETTINGS && window.DTC_SETTINGS.ai_config) || {};

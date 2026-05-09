@@ -233,7 +233,7 @@ const PromoSection = ({ T, lang }) => (
 
 const StoresSection = ({ T, lang }) => {
   const D = window.DTC_DATA;
-  const [active, setActive] = useState(1);
+  const [active, setActive] = useState(D.stores[0]?.id || 1);
   return (
     <section className="stores-section">
       <div className="container">

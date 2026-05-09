@@ -52,12 +52,19 @@ const BikePlaceholder = ({ name, label, dark }) => (
   </div>
 );
 
-const Header = ({ route, setRoute, lang, setLang, theme, setTheme, T }) => (
+const getBrand = () => (window.DTC_SETTINGS && window.DTC_SETTINGS.brand_info) || {};
+
+const Header = ({ route, setRoute, lang, setLang, theme, setTheme, T }) => {
+  const brand = getBrand();
+  const hotline = brand.hotline || '1900 6789';
+  const brandName = brand.name || 'ĐẠI THÀNH CÔNG';
+  const tagline = brand.tagline || 'Premium Motorcycle Network · Est. 2018';
+  return (
   <header className="site-header">
     <div className="header-top">
       <div className="container">
         <div className="top-left">
-          <span><Icon name="phone" size={12} /> Hotline: <strong>1900 6789</strong></span>
+          <span><Icon name="phone" size={12} /> Hotline: <strong>{hotline}</strong></span>
           <span style={{opacity:0.5}}>·</span>
           <span>{lang === 'vi' ? 'Hệ thống 7 cửa hàng - Bình Dương' : '7 stores across Binh Duong'}</span>
         </div>
@@ -72,8 +79,8 @@ const Header = ({ route, setRoute, lang, setLang, theme, setTheme, T }) => (
       <a href="#" className="brand" onClick={(e)=>{e.preventDefault(); setRoute('home');}}>
         <div className="brand-logo"><img src="assets/logo.png" alt="DTC" /></div>
         <div className="brand-text">
-          <div className="brand-name">ĐẠI THÀNH CÔNG</div>
-          <div className="brand-tag">Premium Motorcycle Network · Est. 2018</div>
+          <div className="brand-name">{brandName}</div>
+          <div className="brand-tag">{tagline}</div>
         </div>
       </a>
       <nav className="nav">
@@ -99,16 +106,24 @@ const Header = ({ route, setRoute, lang, setLang, theme, setTheme, T }) => (
       </div>
     </div>
   </header>
-);
+  );
+};
 
-const Footer = ({ T, lang, setRoute }) => (
+const Footer = ({ T, lang, setRoute }) => {
+  const brand = getBrand();
+  const slogan = lang==='vi' ? (brand.slogan_vi || T.slogan) : (brand.slogan_en || T.slogan);
+  const hotline = brand.hotline || '1900 6789';
+  const email = brand.email || 'info@daithanhcong.vn';
+  const hours = brand.hotline_hours || '7:30 — 21:00';
+  const brandName = brand.name || 'ĐẠI THÀNH CÔNG';
+  return (
   <footer className="site-footer">
-    <div className="footer-slogan">{T.slogan}</div>
+    <div className="footer-slogan">{slogan}</div>
     <div className="container footer-grid">
       <div className="footer-brand">
         <div className="footer-logo">
           <img src="assets/logo.png" alt="DTC" />
-          <span>ĐẠI THÀNH CÔNG</span>
+          <span>{brandName}</span>
         </div>
         <p>{lang==='vi'
           ? 'Hệ thống xe máy chính hãng hàng đầu Bình Dương với 7 chi nhánh và hơn 70 nhân viên tận tâm phục vụ. Cam kết minh bạch, bảo hành chính hãng, đồng hành cùng anh/chị trên mọi hành trình.'
@@ -131,17 +146,18 @@ const Footer = ({ T, lang, setRoute }) => (
       </div>
       <div>
         <h4>{lang==='vi'?'Liên hệ':'Contact'}</h4>
-        <a><Icon name="phone" size={12} /> Hotline: 1900 6789</a>
-        <a><Icon name="mail" size={12} /> info@daithanhcong.vn</a>
+        <a><Icon name="phone" size={12} /> Hotline: {hotline}</a>
+        <a><Icon name="mail" size={12} /> {email}</a>
         <a><Icon name="map" size={12} /> {lang==='vi'?'7 chi nhánh tại Bình Dương':'7 branches in Binh Duong'}</a>
-        <a><Icon name="clock" size={12} /> 7:30 — 21:00 ({lang==='vi'?'Mọi ngày':'Daily'})</a>
+        <a><Icon name="clock" size={12} /> {hours} ({lang==='vi'?'Mọi ngày':'Daily'})</a>
       </div>
     </div>
     <div className="container footer-bottom">
-      <div className="copy">© ĐẠI THÀNH CÔNG · 2026 — All rights reserved</div>
+      <div className="copy">© {brandName} · {new Date().getFullYear()} — All rights reserved</div>
       <div>Designed with passion · Bình Dương, Việt Nam</div>
     </div>
   </footer>
-);
+  );
+};
 
 window.DTC_Components = { Icon, BikePlaceholder, Header, Footer };

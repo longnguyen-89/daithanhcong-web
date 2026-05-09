@@ -143,7 +143,7 @@ const DetailPage = ({ p, lang, setRoute }) => {
             <div className="thumbs">
               {[0,1,2,3].map(i => (
                 <div key={i} className={`thumb ${i===tab?'active':''}`}
-                  style={i===0 && p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center'} : null}
+                  style={p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center', opacity: i===tab ? 1 : 0.55} : null}
                   onClick={()=>setTab(i)}></div>
               ))}
             </div>
@@ -336,22 +336,27 @@ const ContactPage = ({ lang, setRoute }) => {
             <div className="eyebrow" style={{color:'var(--gold)'}}>{lang==='vi'?'Kênh liên hệ':'Channels'}</div>
             <h2 style={{marginTop:14}}>{lang==='vi'?'Đa dạng kênh — Mọi lúc':'Always reachable'}</h2>
             <div style={{marginTop:30}}>
-              <div className="contact-item">
-                <div className="ci-icon"><Icon name="phone" size={18} /></div>
-                <div><div className="ci-k">Hotline</div><div className="ci-v">1900 6789 (07:30 — 21:00)</div></div>
-              </div>
-              <div className="contact-item">
-                <div className="ci-icon"><Icon name="chat" size={18} /></div>
-                <div><div className="ci-k">Zalo OA</div><div className="ci-v">@daithanhcong.vn</div></div>
-              </div>
-              <div className="contact-item">
-                <div className="ci-icon"><Icon name="mail" size={18} /></div>
-                <div><div className="ci-k">Email</div><div className="ci-v">info@daithanhcong.vn</div></div>
-              </div>
-              <div className="contact-item" style={{borderBottom:0}}>
-                <div className="ci-icon"><Icon name="map" size={18} /></div>
-                <div><div className="ci-k">{lang==='vi'?'Trụ sở':'HQ'}</div><div className="ci-v">123 ĐL Bình Dương, TP. Thủ Dầu Một</div></div>
-              </div>
+              {(() => {
+                const brand = (window.DTC_SETTINGS && window.DTC_SETTINGS.brand_info) || {};
+                return <>
+                  <div className="contact-item">
+                    <div className="ci-icon"><Icon name="phone" size={18} /></div>
+                    <div><div className="ci-k">Hotline</div><div className="ci-v">{brand.hotline || '1900 6789'} ({brand.hotline_hours || '07:30 — 21:00'})</div></div>
+                  </div>
+                  <div className="contact-item">
+                    <div className="ci-icon"><Icon name="chat" size={18} /></div>
+                    <div><div className="ci-k">Zalo OA</div><div className="ci-v">{brand.zalo_oa || '@daithanhcong.vn'}</div></div>
+                  </div>
+                  <div className="contact-item">
+                    <div className="ci-icon"><Icon name="mail" size={18} /></div>
+                    <div><div className="ci-k">Email</div><div className="ci-v">{brand.email || 'info@daithanhcong.vn'}</div></div>
+                  </div>
+                  <div className="contact-item" style={{borderBottom:0}}>
+                    <div className="ci-icon"><Icon name="map" size={18} /></div>
+                    <div><div className="ci-k">{lang==='vi'?'Trụ sở':'HQ'}</div><div className="ci-v">{brand.hq_address || '123 ĐL Bình Dương, TP. Thủ Dầu Một'}</div></div>
+                  </div>
+                </>;
+              })()}
             </div>
           </div>
           <div className="contact-form">
