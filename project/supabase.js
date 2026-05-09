@@ -58,8 +58,12 @@ function mapNews(row) {
     cat: row.cat,
     title: row.title,
     excerpt: row.excerpt,
+    content: row.content,
     author: row.author,
-    date: new Date(row.published_at).toLocaleDateString('vi-VN')
+    cover: row.cover_url || null,
+    cover_url: row.cover_url || null,
+    date: new Date(row.published_at).toLocaleDateString('vi-VN'),
+    published: row.published
   };
 }
 
@@ -114,6 +118,38 @@ window.dtcLoadOrders = async function() {
     return [];
   }
   return (data || []).map(mapOrder);
+};
+
+window.dtcLoadSettings = async function() {
+  if (!window.dtcSupabase) return {};
+  const { data, error } = await window.dtcSupabase.from('site_settings').select('key, value');
+  if (error) {
+    console.warn('[DTC] Could not load settings:', error.message);
+    return {};
+  }
+  const settings = {};
+  (data || []).forEach(row => { settings[row.key] = row.value; });
+  window.DTC_SETTINGS = settings;
+  window.dispatchEvent(new CustomEvent('dtc:settings-loaded'));
+  return settings;
+};
+
+window.dtcSaveSetting = async function(key, value) {
+  if (!window.dtcSupabase) throw new Error('Supabase not ready');
+  const { error } = await window.dtcSupabase.from('site_settings').upsert({ key, value });
+  if (error) throw error;
+  if (window.DTC_SETTINGS) window.DTC_SETTINGS[key] = value;
+  return true;
+};
+
+window.dtcCreateNews = async function(fields) {
+  return window.dtcSupabase.from('news').insert([fields]).select().single();
+};
+window.dtcUpdateNews = async function(id, fields) {
+  return window.dtcSupabase.from('news').update(fields).eq('id', id).select().single();
+};
+window.dtcDeleteNews = async function(id) {
+  return window.dtcSupabase.from('news').update({ published: false }).eq('id', id);
 };
 
 window.dtcSignIn = async function(email, password) {

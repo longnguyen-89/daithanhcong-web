@@ -216,7 +216,10 @@ const NewsPage = ({ lang, setRoute }) => {
           <div className="news-grid">
             {D.news.map(n => (
               <div key={n.id} className="news-card">
-                <div className="nc-img"><span className="nc-cat">{n.cat}</span>{n.title.slice(0,28)}…</div>
+                <div className="nc-img" style={n.cover ? {backgroundImage:`url(${n.cover})`, backgroundSize:'cover', backgroundPosition:'center'} : null}>
+                  <span className="nc-cat">{n.cat}</span>
+                  {!n.cover && (n.title.slice(0,28) + '…')}
+                </div>
                 <div className="nc-body">
                   <div className="nc-meta">{n.date} · {n.author}</div>
                   <h3>{n.title}</h3>

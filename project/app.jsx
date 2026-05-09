@@ -38,13 +38,14 @@ const App = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [route]);
 
-  // Load data from Supabase on mount (with mock fallback)
+  // Load data + settings from Supabase on mount (with mock fallback)
   useE(() => {
     let cancelled = false;
     const load = async () => {
-      if (window.dtcLoadData) {
-        await window.dtcLoadData();
-      }
+      const promises = [];
+      if (window.dtcLoadData) promises.push(window.dtcLoadData());
+      if (window.dtcLoadSettings) promises.push(window.dtcLoadSettings());
+      await Promise.all(promises);
       if (!cancelled) setDataReady(true);
     };
     if (window.dtcSupabase) load();

@@ -12,7 +12,8 @@ const AdminSidebar = ({ tab, setTab, setRoute }) => {
     { id: 'orders', label: 'Đơn hàng / Tư vấn', icon: 'cart', count: 7 },
     { id: 'branches', label: 'Chi nhánh', icon: 'map', count: 7 },
     { section: 'HỆ THỐNG' },
-    { id: 'settings', label: 'Thiết lập', icon: 'settings' },
+    { id: 'ai', label: 'Trợ lý AI', icon: 'chat' },
+    { id: 'settings', label: 'Thông tin chung', icon: 'settings' },
   ];
   return (
     <aside className="admin-sidebar">
@@ -184,26 +185,42 @@ const AdminProducts = ({ openModal }) => {
 
 const AdminNews = ({ openModal }) => {
   const D = window.DTC_DATA;
+  const [, force] = useState(0);
+
+  const remove = async (n) => {
+    if (!confirm(`Ẩn bài "${n.title}" khỏi website?`)) return;
+    try {
+      const { error } = await window.dtcDeleteNews(n.id);
+      if (error) throw error;
+      D.news = D.news.filter(x => x.id !== n.id);
+      force(x => x + 1);
+    } catch (e) {
+      alert('Lỗi: ' + (e?.message || e));
+    }
+  };
+
   return (
     <div className="page-fade admin-card">
       <div className="admin-card-head">
-        <h3>Tin tức & Khuyến mãi</h3>
+        <h3>Tin tức & Khuyến mãi ({D.news.length})</h3>
         <button className="btn btn-primary" onClick={()=>openModal('news')}><Icon name="plus" size={14} />Đăng bài mới</button>
       </div>
       <table className="admin-table">
-        <thead><tr><th>Tiêu đề</th><th>Chuyên mục</th><th>Tác giả</th><th>Ngày đăng</th><th>Lượt xem</th><th></th></tr></thead>
+        <thead><tr><th></th><th>Tiêu đề</th><th>Chuyên mục</th><th>Tác giả</th><th>Ngày đăng</th><th></th></tr></thead>
         <tbody>
           {D.news.map(n => (
             <tr key={n.id}>
-              <td><div style={{fontWeight:600, maxWidth:480}}>{n.title}</div></td>
+              <td style={{width:60}}>
+                <div style={{width:48, height:36, borderRadius:6, background:'var(--bg-3)',
+                  ...(n.cover ? {backgroundImage:`url(${n.cover})`, backgroundSize:'cover', backgroundPosition:'center'} : {})}}></div>
+              </td>
+              <td><div style={{fontWeight:600, maxWidth:440}}>{n.title}</div></td>
               <td><span className="badge badge-new">{n.cat}</span></td>
               <td style={{fontSize:13, color:'var(--fg-2)'}}>{n.author}</td>
               <td style={{fontFamily:'var(--font-mono)', fontSize:12}}>{n.date}</td>
-              <td style={{fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--burgundy)'}}>{(1200 + n.id*340).toLocaleString()}</td>
               <td><div className="actions">
-                <button><Icon name="eye" size={14} /></button>
                 <button onClick={()=>openModal('news', n)}><Icon name="edit" size={14} /></button>
-                <button><Icon name="trash" size={14} /></button>
+                <button onClick={()=>remove(n)}><Icon name="trash" size={14} /></button>
               </div></td>
             </tr>
           ))}
@@ -493,7 +510,70 @@ const ProductModal = ({ data, close }) => {
   );
 };
 
-const NewsModal = ({ data, close }) => (
+const NewsModal = ({ data, close, onSaved }) => {
+  const cats = ['Khuyến mãi', 'Cẩm nang', 'Tin hãng', 'Sự kiện'];
+  const [form, setForm] = useState({
+    title: data?.title || '',
+    cat: data?.cat || cats[0],
+    author: data?.author || 'Phòng Marketing',
+    excerpt: data?.excerpt || '',
+    content: data?.content || '',
+    cover_url: data?.cover_url || data?.cover || '',
+    published: data?.published !== false
+  });
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState('');
+  const fileRef = React.useRef(null);
+  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleCover = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    setErr('');
+    try {
+      const { url } = await window.dtcUploadImage(file, 'news');
+      upd('cover_url', url);
+    } catch (e) {
+      setErr('Upload thất bại: ' + (e?.message || e));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const save = async (publishImmediate) => {
+    if (busy) return;
+    if (!form.title.trim()) {
+      setErr('Tiêu đề không được trống'); return;
+    }
+    setBusy(true); setErr('');
+    try {
+      const payload = {
+        title: form.title.trim(),
+        cat: form.cat,
+        author: form.author.trim() || 'Phòng Marketing',
+        excerpt: form.excerpt.trim() || null,
+        content: form.content || null,
+        cover_url: form.cover_url || null,
+        published: publishImmediate !== undefined ? publishImmediate : form.published
+      };
+      if (data?.id) {
+        const { error } = await window.dtcUpdateNews(data.id, payload);
+        if (error) throw error;
+      } else {
+        const { error } = await window.dtcCreateNews({ ...payload, published_at: new Date().toISOString() });
+        if (error) throw error;
+      }
+      if (onSaved) await onSaved();
+      close();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
   <div className="modal-overlay" onClick={close}>
     <div className="modal" onClick={(e)=>e.stopPropagation()}>
       <div className="modal-head">
@@ -501,27 +581,79 @@ const NewsModal = ({ data, close }) => (
         <button onClick={close}><Icon name="close" size={18} /></button>
       </div>
       <div className="modal-body">
-        <div className="form-row full"><div><label className="label">Tiêu đề *</label><input className="input" defaultValue={data?.title||''} placeholder="Tiêu đề hấp dẫn..." /></div></div>
+        {err && <div style={{padding:'10px 14px', marginBottom:12, background:'rgba(200,16,46,0.1)', color:'var(--crimson)', borderRadius:8, fontSize:13}}>{err}</div>}
+
+        <div className="form-row full"><div><label className="label">Tiêu đề *</label>
+          <input className="input" value={form.title} onChange={e=>upd('title', e.target.value)} placeholder="Tiêu đề hấp dẫn..." /></div></div>
+
         <div className="form-row">
-          <div><label className="label">Chuyên mục</label><select className="select" defaultValue={data?.cat}><option>Khuyến mãi</option><option>Cẩm nang</option><option>Tin hãng</option><option>Sự kiện</option></select></div>
-          <div><label className="label">Tác giả</label><input className="input" defaultValue={data?.author||'Phòng Marketing'} /></div>
+          <div><label className="label">Chuyên mục</label>
+            <select className="select" value={form.cat} onChange={e=>upd('cat', e.target.value)}>
+              {cats.map(c=><option key={c}>{c}</option>)}
+            </select></div>
+          <div><label className="label">Tác giả</label>
+            <input className="input" value={form.author} onChange={e=>upd('author', e.target.value)} /></div>
         </div>
+
         <div className="form-row full">
-          <div><label className="label">Ảnh đại diện</label>
-            <div className="upload-zone"><div className="uz-icon"><Icon name="upload" size={28} /></div><div style={{fontWeight:600, color:'var(--fg)'}}>Tải ảnh bìa</div></div>
+          <div>
+            <label className="label">Ảnh bìa</label>
+            <div className="upload-zone" style={{cursor:'pointer'}}
+              onClick={() => fileRef.current?.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); handleCover(e.dataTransfer.files?.[0]); }}>
+              {form.cover_url ? (
+                <div style={{display:'flex', gap:14, alignItems:'center'}}>
+                  <img src={form.cover_url} alt="" style={{width:160, height:90, objectFit:'cover', borderRadius:6}} />
+                  <div style={{textAlign:'left', flex:1}}>
+                    <div style={{fontWeight:600, color:'var(--fg)', fontSize:13}}>Ảnh bìa hiện tại — click để đổi</div>
+                    <button type="button" className="btn btn-ghost" style={{marginTop:8, padding:'4px 10px', fontSize:11}}
+                      onClick={e=>{e.stopPropagation(); upd('cover_url', '');}}>Xóa ảnh</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="uz-icon"><Icon name="upload" size={28} /></div>
+                  <div style={{fontWeight:600, color:'var(--fg)'}}>{uploading ? 'Đang upload…' : 'Tải ảnh bìa (PNG/JPG/WebP, ≤5MB)'}</div>
+                </>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>handleCover(e.target.files?.[0])} />
+            </div>
           </div>
         </div>
-        <div className="form-row full"><div><label className="label">Tóm tắt</label><textarea className="input" defaultValue={data?.excerpt||''} placeholder="2-3 câu tóm tắt..."></textarea></div></div>
-        <div className="form-row full"><div><label className="label">Nội dung *</label><textarea className="input" style={{minHeight:160}} placeholder="Nội dung bài viết..."></textarea></div></div>
-        <div style={{display:'flex', justifyContent:'flex-end', gap:10, marginTop:20, paddingTop:20, borderTop:'1px solid var(--border)'}}>
-          <button className="btn btn-ghost" onClick={close}>Hủy</button>
-          <button className="btn btn-ghost">Lưu nháp</button>
-          <button className="btn btn-primary">Đăng bài</button>
+
+        <div className="form-row full"><div><label className="label">Tóm tắt</label>
+          <textarea className="input" value={form.excerpt} onChange={e=>upd('excerpt', e.target.value)} placeholder="2-3 câu tóm tắt hiển thị ở list tin tức..."></textarea></div></div>
+
+        <div className="form-row full"><div>
+          <label className="label" style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
+            <span>Nội dung *</span>
+            <span style={{fontSize:11, color:'var(--fg-3)', fontWeight:400}}>Hỗ trợ Markdown · Xuống dòng tự ngắt đoạn</span>
+          </label>
+          <textarea className="input" style={{minHeight:200, fontFamily:'var(--font-body)', lineHeight:1.6}}
+            value={form.content} onChange={e=>upd('content', e.target.value)}
+            placeholder="Nội dung bài viết...&#10;&#10;**In đậm**, *in nghiêng*&#10;&#10;## Tiêu đề con&#10;&#10;- Mục 1&#10;- Mục 2"></textarea>
+        </div></div>
+
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:20, paddingTop:20, borderTop:'1px solid var(--border)'}}>
+          <label style={{display:'flex', alignItems:'center', gap:8, fontSize:13, cursor:'pointer'}}>
+            <input type="checkbox" checked={form.published} onChange={e=>upd('published', e.target.checked)} />
+            Hiển thị công khai
+          </label>
+          <div style={{display:'flex', gap:10}}>
+            <button className="btn btn-ghost" onClick={close} disabled={busy}>Hủy</button>
+            <button className="btn btn-ghost" onClick={()=>save(false)} disabled={busy}>Lưu nháp</button>
+            <button className="btn btn-primary" onClick={()=>save(true)} disabled={busy}>
+              <Icon name={data?'edit':'plus'} size={14} />
+              {busy ? 'Đang lưu…' : (data ? 'Cập nhật' : 'Đăng bài')}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 const AdminPage = ({ setRoute, session, onSignOut }) => {
   const [tab, setTab] = useState('dashboard');
@@ -545,7 +677,8 @@ const AdminPage = ({ setRoute, session, onSignOut }) => {
     news: 'Tin tức & Khuyến mãi',
     orders: 'Đơn hàng / Tư vấn',
     branches: 'Chi nhánh ĐTC',
-    settings: 'Thiết lập',
+    ai: 'Trợ lý AI · Cấu hình & Kiến thức',
+    settings: 'Thông tin thương hiệu & Liên hệ',
   };
 
   const email = session?.session?.user?.email || 'admin';
@@ -582,19 +715,10 @@ const AdminPage = ({ setRoute, session, onSignOut }) => {
         {tab==='news' && <AdminNews openModal={openModal} />}
         {tab==='orders' && <AdminOrders orders={orders} refresh={refreshOrders} />}
         {tab==='branches' && <AdminBranches />}
-        {tab==='settings' && (
-          <div className="admin-card" style={{padding: 40}}>
-            <h3 style={{marginBottom: 14}}>Thiết lập hệ thống</h3>
-            <p style={{color:'var(--fg-2)', marginBottom: 20}}>Cấu hình thông tin chung, phân quyền, footer, hotline...</p>
-            <div style={{padding:16, background:'var(--bg-3)', borderRadius:8, fontSize:13}}>
-              <div style={{marginBottom:8}}><strong>Email đăng nhập:</strong> {email}</div>
-              <div style={{marginBottom:8}}><strong>Vai trò:</strong> {role}</div>
-              <div><strong>Supabase Project:</strong> daithanhcong-web</div>
-            </div>
-          </div>
-        )}
+        {tab==='ai' && <window.DTC_AdminAISettings />}
+        {tab==='settings' && <window.DTC_AdminSiteInfo />}
         {modal?.type==='product' && <ProductModal data={modal.data} close={close} />}
-        {modal?.type==='news' && <NewsModal data={modal.data} close={close} />}
+        {modal?.type==='news' && <NewsModal data={modal.data} close={close} onSaved={()=>window.dtcLoadData()} />}
       </main>
     </div>
   );

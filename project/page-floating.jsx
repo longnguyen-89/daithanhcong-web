@@ -19,11 +19,13 @@ const FloatingWidgets = ({ openChat, lang }) => (
 );
 
 const AIChat = ({ close, lang }) => {
-  const [msgs, setMsgs] = useState([
-    { role: 'bot', content: lang==='vi'
-        ? 'Xin chào anh/chị! Em là trợ lý AI của ĐẠI THÀNH CÔNG. Em có thể giúp anh/chị tìm xe phù hợp, so sánh thông số, tư vấn trả góp, hoặc đặt lịch lái thử. Anh/chị cần em hỗ trợ gì ạ?'
-        : 'Hello! I am DTC AI assistant. I can help you find the right bike, compare specs, advise on installments or book a test ride. How may I help?' }
-  ]);
+  const aiCfg = (window.DTC_SETTINGS && window.DTC_SETTINGS.ai_config) || {};
+  const defaultWelcome = lang==='vi'
+    ? 'Xin chào anh/chị! Em là trợ lý AI của ĐẠI THÀNH CÔNG. Em có thể giúp anh/chị tìm xe phù hợp, so sánh thông số, tư vấn trả góp, hoặc đặt lịch lái thử. Anh/chị cần em hỗ trợ gì ạ?'
+    : 'Hello! I am DTC AI assistant. I can help you find the right bike, compare specs, advise on installments or book a test ride. How may I help?';
+  const welcomeText = (lang==='vi' ? aiCfg.welcome_vi : aiCfg.welcome_en) || defaultWelcome;
+
+  const [msgs, setMsgs] = useState([{ role: 'bot', content: welcomeText }]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const bodyRef = useRef(null);
@@ -73,9 +75,12 @@ const AIChat = ({ close, lang }) => {
     setBusy(false);
   };
 
-  const suggestions = lang==='vi'
-    ? ['Tư vấn xe SH 350i', 'Trả góp 0% có điều kiện gì?', 'So sánh Exciter và Winner X', 'Đặt lịch lái thử']
-    : ['Tell me about SH 350i', '0% installment terms?', 'Exciter vs Winner', 'Book a test ride'];
+  const defaultSuggVi = ['Tư vấn xe SH 350i', 'Trả góp 0% có điều kiện gì?', 'So sánh Exciter và Winner X', 'Đặt lịch lái thử'];
+  const defaultSuggEn = ['Tell me about SH 350i', '0% installment terms?', 'Exciter vs Winner', 'Book a test ride'];
+  const cfgSugg = lang==='vi' ? aiCfg.suggestions_vi : aiCfg.suggestions_en;
+  const suggestions = (Array.isArray(cfgSugg) && cfgSugg.length > 0)
+    ? cfgSugg.filter(Boolean)
+    : (lang==='vi' ? defaultSuggVi : defaultSuggEn);
 
   return (
     <div className="ai-chat">

@@ -286,9 +286,9 @@ const NewsTeaser = ({ T, lang, setRoute }) => {
         <div className="news-grid">
           {D.news.slice(0,3).map(n => (
             <div key={n.id} className="news-card">
-              <div className="nc-img">
+              <div className="nc-img" style={n.cover ? {backgroundImage:`url(${n.cover})`, backgroundSize:'cover', backgroundPosition:'center'} : null}>
                 <span className="nc-cat">{n.cat}</span>
-                {n.title.slice(0,30)}…
+                {!n.cover && (n.title.slice(0,30) + '…')}
               </div>
               <div className="nc-body">
                 <div className="nc-meta">{n.date} · {n.author}</div>
