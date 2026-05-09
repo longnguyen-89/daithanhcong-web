@@ -15,6 +15,8 @@ const App = () => {
   const [chatOpen, setChatOpen] = useS(false);
   const [tweaks, setTweaks] = window.useTweaks ? window.useTweaks(TWEAK_DEFAULTS) : [TWEAK_DEFAULTS, ()=>{}];
   const [showTweaks, setShowTweaks] = useS(false);
+  const [dataReady, setDataReady] = useS(false);
+  const [session, setSession] = useS(null);
 
   const lang = tweaks.lang;
   const theme = tweaks.theme;
@@ -36,6 +38,35 @@ const App = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [route]);
 
+  // Load data from Supabase on mount (with mock fallback)
+  useE(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (window.dtcLoadData) {
+        await window.dtcLoadData();
+      }
+      if (!cancelled) setDataReady(true);
+    };
+    if (window.dtcSupabase) load();
+    else window.addEventListener('dtc:supabase-ready', load, { once: true });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Watch Supabase auth session
+  useE(() => {
+    if (!window.dtcGetSession) return;
+    let unsub = () => {};
+    window.dtcGetSession().then(s => setSession(s));
+    if (window.dtcOnAuthChange) {
+      unsub = window.dtcOnAuthChange(async (sess) => {
+        if (!sess) { setSession(null); return; }
+        const s = await window.dtcGetSession();
+        setSession(s);
+      });
+    }
+    return unsub;
+  }, []);
+
   // Tweaks host wiring
   useE(() => {
     const onMsg = (e) => {
@@ -52,12 +83,30 @@ const App = () => {
     window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
   };
 
-  // Admin route is full-bleed
+  // Admin route is full-bleed, requires auth
   if (route === 'admin') {
+    const role = session?.profile?.role;
+    if (!session) {
+      return (
+        <>
+          <window.DTC_LoginGate lang={lang} setRoute={setRoute} onSignedIn={async () => {
+            const s = await window.dtcGetSession();
+            setSession(s);
+          }} />
+          {showTweaks && <TweaksUI tweaks={tweaks} setTweaks={setTweaks} close={closeTweaks} />}
+        </>
+      );
+    }
+    if (role !== 'admin' && role !== 'staff') {
+      return (
+        <window.DTC_AccessDenied lang={lang} session={session} setRoute={setRoute}
+          onSignOut={async () => { await window.dtcSignOut(); setSession(null); }} />
+      );
+    }
     return (
       <>
-        <window.DTC_AdminPage setRoute={setRoute} />
-        <window.DTC_FloatingWidgets openChat={()=>setChatOpen(true)} lang={lang} />
+        <window.DTC_AdminPage setRoute={setRoute} session={session}
+          onSignOut={async () => { await window.dtcSignOut(); setSession(null); setRoute('home'); }} />
         {chatOpen && <window.DTC_AIChat close={()=>setChatOpen(false)} lang={lang} />}
         {showTweaks && <TweaksUI tweaks={tweaks} setTweaks={setTweaks} close={closeTweaks} />}
       </>

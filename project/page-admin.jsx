@@ -49,11 +49,12 @@ const StatusPill = ({ s }) => {
   return <span className={`status-pill ${s}`}>{map[s]}</span>;
 };
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ orders }) => {
   const D = window.DTC_DATA;
   const months = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
   const values = [62, 68, 71, 75, 78, 82, 79, 85, 88, 92, 95, 102];
   const max = Math.max(...values);
+  const recentOrders = (orders && orders.length ? orders : D.orders).slice(0, 5);
   return (
     <div className="page-fade">
       <div className="kpi-row">
@@ -102,7 +103,7 @@ const AdminDashboard = () => {
         <table className="admin-table">
           <thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Sản phẩm</th><th>Chi nhánh</th><th>Tổng</th><th>Trạng thái</th><th></th></tr></thead>
           <tbody>
-            {D.orders.slice(0,5).map(o => (
+            {recentOrders.map(o => (
               <tr key={o.id}>
                 <td style={{fontFamily:'var(--font-mono)', fontSize:12, color:'var(--burgundy)', fontWeight:700}}>{o.id}</td>
                 <td><div style={{fontWeight:600}}>{o.customer}</div><div style={{fontSize:11, color:'var(--fg-3)'}}>{o.phone}</div></td>
@@ -122,19 +123,39 @@ const AdminDashboard = () => {
 
 const AdminProducts = ({ openModal }) => {
   const D = window.DTC_DATA;
+  const [filterBrand, setFilterBrand] = useState('all');
+  const [, force] = useState(0);
+  const list = filterBrand === 'all' ? D.products : D.products.filter(p => p.brand === filterBrand);
+
+  const removeProduct = async (p) => {
+    if (!confirm(`Ẩn sản phẩm "${p.name}" khỏi website? (có thể bật lại trong DB)`)) return;
+    try {
+      const { error } = await window.dtcDeleteProduct(p.id);
+      if (error) throw error;
+      D.products = D.products.filter(x => x.id !== p.id);
+      force(n => n + 1);
+    } catch (e) {
+      alert('Lỗi: ' + (e?.message || e));
+    }
+  };
+
   return (
     <div className="page-fade admin-card">
       <div className="admin-card-head">
-        <h3>Quản lý sản phẩm xe ({D.products.length})</h3>
+        <h3>Quản lý sản phẩm xe ({list.length})</h3>
         <div style={{display:'flex', gap:8}}>
-          <select className="select" style={{width:160, padding:'8px 12px'}}><option>Tất cả hãng</option>{D.brands.map(b=><option key={b}>{b}</option>)}</select>
+          <select className="select" style={{width:160, padding:'8px 12px'}}
+            value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
+            <option value="all">Tất cả hãng</option>
+            {D.brands.map(b=><option key={b} value={b}>{b}</option>)}
+          </select>
           <button className="btn btn-primary" onClick={()=>openModal('product')}><Icon name="plus" size={14} />Thêm xe mới</button>
         </div>
       </div>
       <table className="admin-table">
         <thead><tr><th>Sản phẩm</th><th>Hãng</th><th>Loại</th><th>Giá</th><th>Tồn kho</th><th>Chi nhánh</th><th>Trạng thái</th><th></th></tr></thead>
         <tbody>
-          {D.products.map(p => (
+          {list.map(p => (
             <tr key={p.id}>
               <td>
                 <div className="product-cell">
@@ -151,7 +172,7 @@ const AdminProducts = ({ openModal }) => {
               <td><div className="actions">
                 <button title="Xem"><Icon name="eye" size={14} /></button>
                 <button title="Sửa" onClick={()=>openModal('product', p)}><Icon name="edit" size={14} /></button>
-                <button title="Xóa"><Icon name="trash" size={14} /></button>
+                <button title="Ẩn" onClick={()=>removeProduct(p)}><Icon name="trash" size={14} /></button>
               </div></td>
             </tr>
           ))}
@@ -192,20 +213,48 @@ const AdminNews = ({ openModal }) => {
   );
 };
 
-const AdminOrders = () => {
-  const D = window.DTC_DATA;
+const AdminOrders = ({ orders, refresh }) => {
+  const [filter, setFilter] = useState('all');
+  const [busy, setBusy] = useState(null);
+  const list = orders || [];
+  const visible = filter === 'all' ? list : list.filter(o => o.status === filter);
+
+  const updateStatus = async (id, newStatus) => {
+    setBusy(id);
+    try {
+      const { error } = await window.dtcUpdateOrder(id, { status: newStatus });
+      if (error) throw error;
+      await refresh();
+    } catch (e) {
+      alert('Lỗi: ' + (e?.message || e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div className="page-fade admin-card">
-      <div className="admin-card-head"><h3>Đơn hàng / Yêu cầu tư vấn</h3>
+      <div className="admin-card-head"><h3>Đơn hàng / Yêu cầu tư vấn ({list.length})</h3>
         <div style={{display:'flex', gap:8}}>
-          <select className="select" style={{width:160, padding:'8px 12px'}}><option>Tất cả trạng thái</option><option>Chờ xử lý</option><option>Đã xác nhận</option><option>Đã giao</option></select>
+          <select className="select" style={{width:180, padding:'8px 12px'}}
+            value={filter} onChange={e => setFilter(e.target.value)}>
+            <option value="all">Tất cả trạng thái</option>
+            <option value="pending">Chờ xử lý</option>
+            <option value="confirmed">Đã xác nhận</option>
+            <option value="delivered">Đã giao</option>
+            <option value="cancelled">Đã hủy</option>
+          </select>
+          <button className="btn btn-ghost" onClick={refresh}><Icon name="arrow" size={14} />Làm mới</button>
         </div>
       </div>
       <table className="admin-table">
         <thead><tr><th>Mã</th><th>Khách hàng</th><th>Sản phẩm</th><th>Chi nhánh</th><th>Ngày</th><th>Tổng</th><th>Trạng thái</th><th></th></tr></thead>
         <tbody>
-          {D.orders.map(o => (
-            <tr key={o.id}>
+          {visible.length === 0 && (
+            <tr><td colSpan={8} style={{textAlign:'center', padding:30, color:'var(--fg-3)'}}>Không có đơn hàng nào</td></tr>
+          )}
+          {visible.map(o => (
+            <tr key={o.id} style={{opacity: busy === o.id ? 0.5 : 1}}>
               <td style={{fontFamily:'var(--font-mono)', fontSize:12, color:'var(--burgundy)', fontWeight:700}}>{o.id}</td>
               <td><div style={{fontWeight:600}}>{o.customer}</div><div style={{fontSize:11, color:'var(--fg-3)'}}>{o.phone}</div></td>
               <td>{o.product}</td>
@@ -213,10 +262,16 @@ const AdminOrders = () => {
               <td style={{fontFamily:'var(--font-mono)', fontSize:12}}>{o.date}</td>
               <td style={{fontFamily:'var(--font-display)', fontWeight:700, color:'var(--burgundy)'}}>{window.formatVND(o.total)}</td>
               <td><StatusPill s={o.status} /></td>
-              <td><div className="actions">
-                <button><Icon name="eye" size={14} /></button>
-                <button><Icon name="edit" size={14} /></button>
-              </div></td>
+              <td>
+                <select className="select" style={{padding:'4px 8px', fontSize:11, width:130}}
+                  value={o.status} disabled={busy === o.id}
+                  onChange={e => updateStatus(o.id, e.target.value)}>
+                  <option value="pending">Chờ xử lý</option>
+                  <option value="confirmed">Đã xác nhận</option>
+                  <option value="delivered">Đã giao</option>
+                  <option value="cancelled">Đã hủy</option>
+                </select>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -258,7 +313,67 @@ const AdminBranches = () => {
   );
 };
 
-const ProductModal = ({ data, close }) => (
+const ProductModal = ({ data, close }) => {
+  const D = window.DTC_DATA;
+  const [form, setForm] = useState({
+    name: data?.name || '',
+    brand: data?.brand || D.brands[0],
+    cat: data?.cat || D.categories[0].id,
+    price: data?.price || '',
+    old_price: data?.oldPrice || '',
+    cc: data?.cc ?? '',
+    year: data?.year || 2026,
+    status: data?.status || 'new',
+    stock: data?.stock ?? 1,
+    color: data?.color || '',
+    store_id: data?.storeId || D.stores[0]?.id,
+    fuel: data?.fuel || 'Xăng',
+    features: (data?.features || []).join('\n'),
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const save = async () => {
+    if (busy) return;
+    if (!form.name.trim() || !form.price) {
+      setErr('Tên xe và giá là bắt buộc'); return;
+    }
+    setBusy(true); setErr('');
+    try {
+      const payload = {
+        name: form.name.trim(),
+        brand: form.brand,
+        cat: form.cat,
+        price: Number(form.price),
+        old_price: form.old_price ? Number(form.old_price) : null,
+        cc: Number(form.cc) || 0,
+        year: Number(form.year),
+        status: form.status,
+        stock: Number(form.stock) || 0,
+        color: form.color.trim() || null,
+        store_id: Number(form.store_id) || null,
+        fuel: form.fuel,
+        features: form.features.split('\n').map(s => s.trim()).filter(Boolean),
+        is_active: true
+      };
+      if (data?.id) {
+        const { error } = await window.dtcUpdateProduct(data.id, payload);
+        if (error) throw error;
+      } else {
+        const { error } = await window.dtcCreateProduct(payload);
+        if (error) throw error;
+      }
+      await window.dtcLoadData();
+      close();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
   <div className="modal-overlay" onClick={close}>
     <div className="modal" onClick={(e)=>e.stopPropagation()}>
       <div className="modal-head">
@@ -266,51 +381,70 @@ const ProductModal = ({ data, close }) => (
         <button onClick={close}><Icon name="close" size={18} /></button>
       </div>
       <div className="modal-body">
-        <div className="form-row full"><div><label className="label">Tên xe *</label><input className="input" defaultValue={data?.name||''} placeholder="VD: Honda SH 350i ABS" /></div></div>
+        {err && <div style={{padding:'10px 14px', marginBottom:12, background:'rgba(200,16,46,0.1)', color:'var(--crimson)', borderRadius:8, fontSize:13}}>{err}</div>}
+        <div className="form-row full"><div><label className="label">Tên xe *</label>
+          <input className="input" placeholder="VD: Honda SH 350i ABS" value={form.name} onChange={e=>upd('name', e.target.value)} /></div></div>
         <div className="form-row">
-          <div><label className="label">Hãng *</label><select className="select" defaultValue={data?.brand}>{window.DTC_DATA.brands.map(b=><option key={b}>{b}</option>)}</select></div>
-          <div><label className="label">Loại xe *</label><select className="select" defaultValue={data?.cat}>{window.DTC_DATA.categories.map(c=><option key={c.id} value={c.id}>{c.vi}</option>)}</select></div>
+          <div><label className="label">Hãng *</label>
+            <select className="select" value={form.brand} onChange={e=>upd('brand', e.target.value)}>
+              {D.brands.map(b=><option key={b}>{b}</option>)}
+            </select></div>
+          <div><label className="label">Loại xe *</label>
+            <select className="select" value={form.cat} onChange={e=>upd('cat', e.target.value)}>
+              {D.categories.map(c=><option key={c.id} value={c.id}>{c.vi}</option>)}
+            </select></div>
         </div>
         <div className="form-row">
-          <div><label className="label">Giá bán (₫) *</label><input className="input" type="number" defaultValue={data?.price||''} /></div>
-          <div><label className="label">Giá gốc (gạch ngang)</label><input className="input" type="number" defaultValue={data?.oldPrice||''} /></div>
+          <div><label className="label">Giá bán (₫) *</label>
+            <input className="input" type="number" value={form.price} onChange={e=>upd('price', e.target.value)} /></div>
+          <div><label className="label">Giá gốc (gạch ngang)</label>
+            <input className="input" type="number" value={form.old_price} onChange={e=>upd('old_price', e.target.value)} /></div>
         </div>
         <div className="form-row">
-          <div><label className="label">Dung tích (cc)</label><input className="input" type="number" defaultValue={data?.cc||''} /></div>
-          <div><label className="label">Năm SX</label><input className="input" type="number" defaultValue={data?.year||2026} /></div>
+          <div><label className="label">Dung tích (cc)</label>
+            <input className="input" type="number" value={form.cc} onChange={e=>upd('cc', e.target.value)} /></div>
+          <div><label className="label">Năm SX</label>
+            <input className="input" type="number" value={form.year} onChange={e=>upd('year', e.target.value)} /></div>
         </div>
         <div className="form-row">
-          <div><label className="label">Tình trạng</label><select className="select" defaultValue={data?.status}><option value="new">Xe mới</option><option value="used">Đã qua sử dụng</option></select></div>
-          <div><label className="label">Tồn kho</label><input className="input" type="number" defaultValue={data?.stock||1} /></div>
+          <div><label className="label">Tình trạng</label>
+            <select className="select" value={form.status} onChange={e=>upd('status', e.target.value)}>
+              <option value="new">Xe mới</option><option value="used">Đã qua sử dụng</option>
+            </select></div>
+          <div><label className="label">Tồn kho</label>
+            <input className="input" type="number" value={form.stock} onChange={e=>upd('stock', e.target.value)} /></div>
+        </div>
+        <div className="form-row">
+          <div><label className="label">Màu sắc</label>
+            <input className="input" placeholder="VD: Đỏ Mâm Xôi" value={form.color} onChange={e=>upd('color', e.target.value)} /></div>
+          <div><label className="label">Nhiên liệu</label>
+            <select className="select" value={form.fuel} onChange={e=>upd('fuel', e.target.value)}>
+              <option>Xăng</option><option>Điện</option><option>Hybrid</option>
+            </select></div>
         </div>
         <div className="form-row full">
-          <div><label className="label">Chi nhánh</label><select className="select" defaultValue={data?.store}>{window.DTC_DATA.stores.map(s=><option key={s.id}>{s.name}</option>)}</select></div>
+          <div><label className="label">Chi nhánh</label>
+            <select className="select" value={form.store_id} onChange={e=>upd('store_id', e.target.value)}>
+              {D.stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </select></div>
         </div>
         <div className="form-row full">
-          <div>
-            <label className="label">Hình ảnh xe</label>
-            <div className="upload-zone">
-              <div className="uz-icon"><Icon name="upload" size={28} /></div>
-              <div style={{fontWeight:600, color:'var(--fg)'}}>Kéo thả hoặc click để upload</div>
-              <div style={{fontSize:12, marginTop:4}}>PNG, JPG · Tối đa 10 ảnh · Mỗi ảnh ≤ 5MB</div>
-            </div>
-            <div className="image-thumbs">
-              {[1,2,3,4].map(i => <div key={i} className="it"></div>)}
-              <div className="it add">+</div>
-            </div>
-          </div>
-        </div>
-        <div className="form-row full">
-          <div><label className="label">Mô tả & tính năng</label><textarea className="input" style={{minHeight:100}} defaultValue={data?.features?.join('\n')||''} placeholder="Mỗi dòng là 1 tính năng..."></textarea></div>
+          <div><label className="label">Tính năng (mỗi dòng 1 tính năng)</label>
+            <textarea className="input" style={{minHeight:100}} value={form.features} onChange={e=>upd('features', e.target.value)}
+              placeholder="Hệ thống ABS 2 kênh&#10;Smart Key&#10;Idling Stop"></textarea></div>
         </div>
         <div style={{display:'flex', justifyContent:'flex-end', gap:10, marginTop:20, paddingTop:20, borderTop:'1px solid var(--border)'}}>
           <button className="btn btn-ghost" onClick={close}>Hủy</button>
-          <button className="btn btn-primary"><Icon name="plus" size={14} />Lưu sản phẩm</button>
+          <button className="btn btn-primary" onClick={save} disabled={busy}>
+            <Icon name={data ? "edit" : "plus"} size={14} />
+            {busy ? 'Đang lưu…' : (data ? 'Cập nhật' : 'Lưu sản phẩm')}
+          </button>
         </div>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 const NewsModal = ({ data, close }) => (
   <div className="modal-overlay" onClick={close}>
@@ -342,11 +476,21 @@ const NewsModal = ({ data, close }) => (
   </div>
 );
 
-const AdminPage = ({ setRoute }) => {
+const AdminPage = ({ setRoute, session, onSignOut }) => {
   const [tab, setTab] = useState('dashboard');
   const [modal, setModal] = useState(null);
+  const [orders, setOrders] = useState([]);
   const openModal = (type, data) => setModal({ type, data });
   const close = () => setModal(null);
+
+  const refreshOrders = React.useCallback(async () => {
+    if (window.dtcLoadOrders) {
+      const data = await window.dtcLoadOrders();
+      setOrders(data);
+    }
+  }, []);
+
+  React.useEffect(() => { refreshOrders(); }, [refreshOrders]);
 
   const titles = {
     dashboard: 'Tổng quan hệ thống',
@@ -356,6 +500,11 @@ const AdminPage = ({ setRoute }) => {
     branches: 'Chi nhánh ĐTC',
     settings: 'Thiết lập',
   };
+
+  const email = session?.session?.user?.email || 'admin';
+  const name = session?.profile?.full_name || email.split('@')[0];
+  const role = session?.profile?.role || 'viewer';
+  const initials = (name || 'A').split(' ').slice(-2).map(s => s[0]).join('').toUpperCase().slice(0,2);
 
   return (
     <div className="admin-shell">
@@ -372,17 +521,31 @@ const AdminPage = ({ setRoute }) => {
             <div className="search-box"><Icon name="search" size={14} /><input placeholder="Tìm kiếm nhanh..." /></div>
             <button className="icon-btn" style={{position:'relative'}}><Icon name="bell" size={16} /><span style={{position:'absolute', top:6, right:8, width:8, height:8, borderRadius:999, background:'var(--crimson)'}}></span></button>
             <div style={{display:'flex', alignItems:'center', gap:10, padding:'4px 14px 4px 4px', borderRadius:999, background:'var(--bg-2)', border:'1px solid var(--border)'}}>
-              <div style={{width:32, height:32, borderRadius:999, background:'var(--burgundy)', color:'#fff', display:'grid', placeItems:'center', fontWeight:700, fontSize:13}}>NV</div>
-              <div><div style={{fontSize:13, fontWeight:600}}>NV. Hoàng Long</div><div style={{fontSize:10, color:'var(--fg-3)', fontFamily:'var(--font-mono)'}}>CN THUẬN AN</div></div>
+              <div style={{width:32, height:32, borderRadius:999, background:'var(--burgundy)', color:'#fff', display:'grid', placeItems:'center', fontWeight:700, fontSize:13}}>{initials}</div>
+              <div>
+                <div style={{fontSize:13, fontWeight:600}}>{name}</div>
+                <div style={{fontSize:10, color:'var(--fg-3)', fontFamily:'var(--font-mono)', textTransform:'uppercase'}}>{role}</div>
+              </div>
             </div>
+            <button className="icon-btn" onClick={onSignOut} title="Đăng xuất"><Icon name="arrow" size={16} /></button>
           </div>
         </div>
-        {tab==='dashboard' && <AdminDashboard />}
+        {tab==='dashboard' && <AdminDashboard orders={orders} />}
         {tab==='products' && <AdminProducts openModal={openModal} />}
         {tab==='news' && <AdminNews openModal={openModal} />}
-        {tab==='orders' && <AdminOrders />}
+        {tab==='orders' && <AdminOrders orders={orders} refresh={refreshOrders} />}
         {tab==='branches' && <AdminBranches />}
-        {tab==='settings' && <div className="admin-card" style={{padding: 40}}><h3 style={{marginBottom: 14}}>Thiết lập hệ thống</h3><p style={{color:'var(--fg-2)'}}>Cấu hình thông tin chung, phân quyền, footer, hotline... (Demo).</p></div>}
+        {tab==='settings' && (
+          <div className="admin-card" style={{padding: 40}}>
+            <h3 style={{marginBottom: 14}}>Thiết lập hệ thống</h3>
+            <p style={{color:'var(--fg-2)', marginBottom: 20}}>Cấu hình thông tin chung, phân quyền, footer, hotline...</p>
+            <div style={{padding:16, background:'var(--bg-3)', borderRadius:8, fontSize:13}}>
+              <div style={{marginBottom:8}}><strong>Email đăng nhập:</strong> {email}</div>
+              <div style={{marginBottom:8}}><strong>Vai trò:</strong> {role}</div>
+              <div><strong>Supabase Project:</strong> daithanhcong-web</div>
+            </div>
+          </div>
+        )}
         {modal?.type==='product' && <ProductModal data={modal.data} close={close} />}
         {modal?.type==='news' && <NewsModal data={modal.data} close={close} />}
       </main>

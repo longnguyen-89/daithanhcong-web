@@ -262,7 +262,56 @@ const StoresPage = ({ lang, setRoute }) => {
   );
 };
 
-const ContactPage = ({ lang, setRoute }) => (
+const ContactPage = ({ lang, setRoute }) => {
+  const D = window.DTC_DATA;
+  const [form, setForm] = useState({
+    customer: '', phone: '', email: '',
+    productId: D.products[0]?.id || null,
+    storeId: D.stores[0]?.id || null,
+    message: ''
+  });
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    if (busy) return;
+    if (!form.customer.trim() || !form.phone.trim()) {
+      setResult({ ok: false, msg: lang==='vi' ? 'Vui lòng nhập họ tên và số điện thoại' : 'Please enter your name and phone' });
+      return;
+    }
+    setBusy(true);
+    setResult(null);
+    try {
+      const product = D.products.find(p => p.id === Number(form.productId));
+      const store = D.stores.find(s => s.id === Number(form.storeId));
+      const { data, error } = await window.dtcSubmitOrder({
+        customer: form.customer.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim() || null,
+        productId: product?.id || null,
+        productName: product?.name || null,
+        storeId: store?.id || null,
+        storeName: store?.name || null,
+        total: product?.price || 0,
+        message: form.message.trim() || null
+      });
+      if (error) throw error;
+      setResult({
+        ok: true,
+        msg: lang==='vi'
+          ? `Cảm ơn ${form.customer}! Mã đơn của anh/chị: ${data.id}. Đội ngũ ĐTC sẽ liên hệ trong vòng 30 phút.`
+          : `Thanks ${form.customer}! Your reference: ${data.id}. Our team will reach out within 30 minutes.`
+      });
+      setForm({ customer:'', phone:'', email:'', productId: form.productId, storeId: form.storeId, message:'' });
+    } catch (e) {
+      setResult({ ok: false, msg: (lang==='vi' ? 'Gửi không thành công: ' : 'Submission failed: ') + (e?.message || e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
   <div className="page-fade">
     <div className="page-hero">
       <div className="container">
@@ -300,19 +349,52 @@ const ContactPage = ({ lang, setRoute }) => (
             <div className="eyebrow">{lang==='vi'?'Gửi yêu cầu':'Inquiry'}</div>
             <h3 style={{marginTop:10}}>{lang==='vi'?'Để chúng tôi liên hệ tư vấn':'We will get back to you'}</h3>
             <p style={{color:'var(--fg-2)', marginTop:6, fontSize:13}}>{lang==='vi'?'Anh/chị vui lòng điền thông tin chính xác để được hỗ trợ tốt nhất.':'Please fill in accurate info for best support.'}</p>
+            {result && (
+              <div style={{
+                marginTop: 14, padding: '12px 14px', borderRadius: 10,
+                background: result.ok ? 'rgba(46,160,67,0.1)' : 'rgba(200,16,46,0.1)',
+                border: `1px solid ${result.ok ? 'rgba(46,160,67,0.3)' : 'rgba(200,16,46,0.3)'}`,
+                color: result.ok ? '#1a7f37' : 'var(--crimson)',
+                fontSize: 13, lineHeight: 1.5
+              }}>{result.msg}</div>
+            )}
             <div className="form-grid">
-              <div><label className="label">{lang==='vi'?'Họ và tên':'Full name'} *</label><input className="input" placeholder="Nguyễn Văn A" /></div>
-              <div><label className="label">{lang==='vi'?'Số điện thoại':'Phone'} *</label><input className="input" placeholder="0903 ..." /></div>
-              <div><label className="label">{lang==='vi'?'Mẫu xe quan tâm':'Bike of interest'}</label><select className="select"><option>Honda SH 350i</option><option>Yamaha Exciter</option><option>Vision 2026</option></select></div>
-              <div><label className="label">{lang==='vi'?'Chi nhánh gần':'Nearest branch'}</label><select className="select">{window.DTC_DATA.stores.map(s=><option key={s.id}>{s.name}</option>)}</select></div>
-              <div className="full"><label className="label">{lang==='vi'?'Nội dung':'Message'}</label><textarea className="input" placeholder={lang==='vi'?'Anh/chị muốn tư vấn về…':'I would like to know about…'}></textarea></div>
-              <div className="full"><button className="btn btn-primary"><Icon name="send" size={14} />{lang==='vi'?'Gửi yêu cầu':'Submit'}</button></div>
+              <div><label className="label">{lang==='vi'?'Họ và tên':'Full name'} *</label>
+                <input className="input" placeholder="Nguyễn Văn A"
+                  value={form.customer} onChange={e=>upd('customer', e.target.value)} /></div>
+              <div><label className="label">{lang==='vi'?'Số điện thoại':'Phone'} *</label>
+                <input className="input" placeholder="0903 ..."
+                  value={form.phone} onChange={e=>upd('phone', e.target.value)} /></div>
+              <div><label className="label">Email</label>
+                <input className="input" type="email" placeholder="email@example.com"
+                  value={form.email} onChange={e=>upd('email', e.target.value)} /></div>
+              <div><label className="label">{lang==='vi'?'Mẫu xe quan tâm':'Bike of interest'}</label>
+                <select className="select" value={form.productId || ''}
+                  onChange={e=>upd('productId', e.target.value ? Number(e.target.value) : null)}>
+                  {D.products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select></div>
+              <div><label className="label">{lang==='vi'?'Chi nhánh gần':'Nearest branch'}</label>
+                <select className="select" value={form.storeId || ''}
+                  onChange={e=>upd('storeId', e.target.value ? Number(e.target.value) : null)}>
+                  {D.stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select></div>
+              <div className="full"><label className="label">{lang==='vi'?'Nội dung':'Message'}</label>
+                <textarea className="input"
+                  value={form.message} onChange={e=>upd('message', e.target.value)}
+                  placeholder={lang==='vi'?'Anh/chị muốn tư vấn về…':'I would like to know about…'}></textarea></div>
+              <div className="full">
+                <button className="btn btn-primary" onClick={submit} disabled={busy}>
+                  <Icon name="send" size={14} />
+                  {busy ? (lang==='vi'?'Đang gửi…':'Submitting…') : (lang==='vi'?'Gửi yêu cầu':'Submit')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </section>
   </div>
-);
+  );
+};
 
 window.DTC_Pages = { ProductsPage, DetailPage, NewsPage, StoresPage, ContactPage };
