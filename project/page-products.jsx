@@ -85,8 +85,8 @@ const ProductsPage = ({ T, lang, setRoute, setActiveProduct }) => {
               <div className="products-list">
                 {paged.map(p => (
                   <div key={p.id} className="product-row" onClick={()=>{setActiveProduct(p); setRoute('detail');}}>
-                    <div className="pc-img" style={{aspectRatio: '4/3'}}>
-                      <BikePlaceholder name={p.name} label={p.brand} />
+                    <div className="pc-img" style={p.image ? {aspectRatio:'4/3', backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center'} : {aspectRatio: '4/3'}}>
+                      {!p.image && <BikePlaceholder name={p.name} label={p.brand} />}
                     </div>
                     <div className="row-info">
                       <div className="pc-brand">{p.brand} · {p.year} · {p.color}</div>
@@ -137,9 +137,15 @@ const DetailPage = ({ p, lang, setRoute }) => {
       <div className="container">
         <div className="detail-layout">
           <div className="gallery">
-            <div className="main-img">{p.name}</div>
+            <div className="main-img" style={p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center'} : null}>
+              {!p.image && p.name}
+            </div>
             <div className="thumbs">
-              {[0,1,2,3].map(i => <div key={i} className={`thumb ${i===tab?'active':''}`} onClick={()=>setTab(i)}></div>)}
+              {[0,1,2,3].map(i => (
+                <div key={i} className={`thumb ${i===tab?'active':''}`}
+                  style={i===0 && p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center'} : null}
+                  onClick={()=>setTab(i)}></div>
+              ))}
             </div>
           </div>
           <div className="detail-info">

@@ -149,8 +149,8 @@ const ProductCard = ({ p, setRoute, setActiveProduct, lang }) => {
   const b = p.badge ? badgeMap[p.badge] : null;
   return (
     <div className="product-card" onClick={()=>{ setActiveProduct(p); setRoute('detail'); }}>
-      <div className="pc-img">
-        <div className="ph-name">{p.name}</div>
+      <div className="pc-img" style={p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center'} : null}>
+        {!p.image && <div className="ph-name">{p.name}</div>}
         <div className="pc-badges">
           {b && <span className={`badge ${b.cls}`}>{b.label}</span>}
           {p.status === 'used' && <span className="badge badge-used">{lang==='vi'?'XE CŨ':'USED'}</span>}

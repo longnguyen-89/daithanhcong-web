@@ -159,7 +159,7 @@ const AdminProducts = ({ openModal }) => {
             <tr key={p.id}>
               <td>
                 <div className="product-cell">
-                  <div className="mini-img"></div>
+                  <div className="mini-img" style={p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center', background: undefined} : null}></div>
                   <div><div className="pname">{p.name}</div><div className="pmeta">ID #{p.id} · {p.year} · {p.color}</div></div>
                 </div>
               </td>
@@ -329,10 +329,27 @@ const ProductModal = ({ data, close }) => {
     store_id: data?.storeId || D.stores[0]?.id,
     fuel: data?.fuel || 'Xăng',
     features: (data?.features || []).join('\n'),
+    image_url: data?.image || ''
   });
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState('');
+  const fileInputRef = React.useRef(null);
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    setErr('');
+    try {
+      const { url } = await window.dtcUploadImage(file, 'products');
+      upd('image_url', url);
+    } catch (e) {
+      setErr('Upload thất bại: ' + (e?.message || e));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const save = async () => {
     if (busy) return;
@@ -355,6 +372,7 @@ const ProductModal = ({ data, close }) => {
         store_id: Number(form.store_id) || null,
         fuel: form.fuel,
         features: form.features.split('\n').map(s => s.trim()).filter(Boolean),
+        image_url: form.image_url || null,
         is_active: true
       };
       if (data?.id) {
@@ -427,6 +445,35 @@ const ProductModal = ({ data, close }) => {
             <select className="select" value={form.store_id} onChange={e=>upd('store_id', e.target.value)}>
               {D.stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
             </select></div>
+        </div>
+        <div className="form-row full">
+          <div>
+            <label className="label">Ảnh xe</label>
+            <div className="upload-zone" style={{position:'relative', cursor:'pointer'}}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); }}
+              onDrop={(e) => { e.preventDefault(); handleFile(e.dataTransfer.files?.[0]); }}>
+              {form.image_url ? (
+                <div style={{display:'flex', gap:14, alignItems:'center'}}>
+                  <img src={form.image_url} alt="" style={{width:120, height:90, objectFit:'cover', borderRadius:6, border:'1px solid var(--border)'}} />
+                  <div style={{textAlign:'left', flex:1}}>
+                    <div style={{fontWeight:600, color:'var(--fg)', fontSize:13}}>Ảnh hiện tại — click để đổi</div>
+                    <div style={{fontSize:11, marginTop:4, color:'var(--fg-3)', wordBreak:'break-all'}}>{form.image_url.split('/').pop()}</div>
+                    <button type="button" className="btn btn-ghost" style={{marginTop:8, padding:'4px 10px', fontSize:11}}
+                      onClick={(e) => { e.stopPropagation(); upd('image_url', ''); }}>Xóa ảnh</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="uz-icon"><Icon name="upload" size={28} /></div>
+                  <div style={{fontWeight:600, color:'var(--fg)'}}>{uploading ? 'Đang upload…' : 'Kéo thả hoặc click để upload'}</div>
+                  <div style={{fontSize:12, marginTop:4}}>PNG, JPG, WebP · Tối đa 5MB</div>
+                </>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/*" style={{display:'none'}}
+                onChange={(e) => handleFile(e.target.files?.[0])} />
+            </div>
+          </div>
         </div>
         <div className="form-row full">
           <div><label className="label">Tính năng (mỗi dòng 1 tính năng)</label>

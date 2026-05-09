@@ -179,3 +179,27 @@ window.dtcDeleteProduct = async function(id) {
 window.dtcUpdateOrder = async function(id, fields) {
   return window.dtcSupabase.from('orders').update(fields).eq('id', id).select().single();
 };
+
+// Upload image to Supabase Storage (returns public URL)
+window.dtcUploadImage = async function(file, folder) {
+  if (!window.dtcSupabase) throw new Error('Supabase not ready');
+  if (!file) throw new Error('No file provided');
+  if (file.size > 5 * 1024 * 1024) throw new Error('Ảnh > 5MB. Vui lòng nén lại.');
+
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const safeFolder = (folder || 'misc').replace(/[^a-z0-9-]/gi, '-');
+  const fileName = `${safeFolder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+
+  const { error } = await window.dtcSupabase.storage
+    .from('public-images')
+    .upload(fileName, file, { cacheControl: '31536000', contentType: file.type, upsert: false });
+  if (error) throw error;
+
+  const { data } = window.dtcSupabase.storage.from('public-images').getPublicUrl(fileName);
+  return { path: fileName, url: data.publicUrl };
+};
+
+window.dtcDeleteImage = async function(path) {
+  if (!window.dtcSupabase) return;
+  return window.dtcSupabase.storage.from('public-images').remove([path]);
+};

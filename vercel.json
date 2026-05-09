@@ -5,5 +5,11 @@
   "framework": null,
   "installCommand": null,
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "functions": {
+    "api/*.js": {
+      "memory": 256,
+      "maxDuration": 15
+    }
+  }
 }

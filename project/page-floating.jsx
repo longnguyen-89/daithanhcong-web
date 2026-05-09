@@ -37,24 +37,38 @@ const AIChat = ({ close, lang }) => {
     setMsgs(m => [...m, { role: 'user', content: t }]);
     setBusy(true);
     try {
-      if (window.claude && typeof window.claude.complete === 'function') {
-        const sys = lang==='vi'
-          ? 'Bạn là trợ lý tư vấn xe máy của ĐẠI THÀNH CÔNG (ĐTC) — hệ thống 7 cửa hàng tại Bình Dương. Bạn xưng "em", gọi khách "anh/chị", thân thiện chuyên nghiệp. Sản phẩm chính: Honda SH 350i (148.9tr), Yamaha Exciter 155 (53.5tr), Honda Vision (32.9tr), Air Blade 160, VinFast Klara S, xe đã qua sử dụng. Hotline 1900 6789, mở cửa 7:30-21:00. Trả lời ngắn gọn 2-4 câu, gợi ý hành động cụ thể.'
-          : 'You are a motorcycle assistant for DAI THANH CONG (DTC) — 7 stores in Binh Duong. Friendly and professional. Key products: Honda SH 350i (148.9M VND), Yamaha Exciter 155, Honda Vision, Air Blade 160, VinFast Klara S electric, used bikes. Hotline 1900 6789, hours 7:30-21:00. Reply concisely 2-4 sentences with concrete suggestions.';
-        const r = await window.claude.complete({
-          messages: [{ role:'user', content: `${sys}\n\nKhách hỏi: ${t}` }]
-        });
-        setMsgs(m => [...m, { role:'bot', content: r }]);
+      const history = msgs.slice(-6).map(m => ({ role: m.role, content: m.content }));
+      const apiRes = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: t, history, lang })
+      });
+
+      if (apiRes.ok) {
+        const data = await apiRes.json();
+        if (data.reply) {
+          setMsgs(m => [...m, { role: 'bot', content: data.reply }]);
+        } else {
+          throw new Error('Empty reply');
+        }
+      } else if (apiRes.status === 503) {
+        // Server intentionally returned fallback (no API key) — use rule-based
+        const reply = window.DTC_aiFallback
+          ? window.DTC_aiFallback(t, lang)
+          : (lang==='vi'
+              ? 'Cảm ơn anh/chị! Vui lòng gọi 1900 6789 để được hỗ trợ nhanh nhất.'
+              : 'Thanks! Please call 1900 6789 for fastest support.');
+        setMsgs(m => [...m, { role: 'bot', content: reply }]);
       } else {
-        await new Promise(r => setTimeout(r, 600));
-        const reply = window.DTC_aiFallback ? window.DTC_aiFallback(t, lang) :
-          (lang==='vi'
-            ? 'Cảm ơn anh/chị đã quan tâm! Để được tư vấn chi tiết và nhanh nhất, anh/chị vui lòng gọi hotline 1900 6789 (7:30 — 21:00) hoặc để lại thông tin tại mục Liên hệ. Đội ngũ ĐTC sẽ phản hồi trong vòng 30 phút ạ!'
-            : 'Thanks for reaching out! For the fastest and most detailed support, please call our hotline 1900 6789 (7:30 — 21:00) or leave your details on the Contact page. Our team will get back to you within 30 minutes.');
-        setMsgs(m => [...m, { role:'bot', content: reply }]);
+        throw new Error(`API ${apiRes.status}`);
       }
     } catch (e) {
-      setMsgs(m => [...m, { role:'bot', content: lang==='vi'?'Xin lỗi anh/chị, em đang gặp sự cố nhỏ. Anh/chị vui lòng gọi hotline 1900 6789 nhé!':'Sorry, I have a small issue. Please call 1900 6789!' }]);
+      const reply = window.DTC_aiFallback
+        ? window.DTC_aiFallback(t, lang)
+        : (lang==='vi'
+            ? 'Xin lỗi anh/chị, em đang gặp sự cố nhỏ. Vui lòng gọi hotline 1900 6789 ạ!'
+            : 'Sorry, I have a small issue. Please call 1900 6789!');
+      setMsgs(m => [...m, { role: 'bot', content: reply }]);
     }
     setBusy(false);
   };
