@@ -1,6 +1,16 @@
 // === Home Page ===
 const { Icon, BikePlaceholder } = window.DTC_Components;
 
+const mergeHomeCopy = (T, lang) => {
+  const cfg = (window.DTC_SETTINGS && window.DTC_SETTINGS.home_content) || {};
+  const local = cfg[lang] || {};
+  return {
+    ...T,
+    hero: { ...T.hero, ...(local.hero || {}) },
+    sections: { ...T.sections, ...(local.sections || {}) }
+  };
+};
+
 const HeroV1 = ({ T, setRoute }) => (
   <section className="hero">
     <div className="container hero-grid">
@@ -304,16 +314,17 @@ const NewsTeaser = ({ T, lang, setRoute }) => {
 };
 
 const Home = ({ T, lang, setRoute, setActiveProduct, heroVariant }) => {
+  const homeT = mergeHomeCopy(T, lang);
   const HeroComp = heroVariant === 'b' ? HeroV2 : heroVariant === 'c' ? HeroV3 : HeroV1;
   return (
     <div className="page-fade">
-      <HeroComp T={T} setRoute={setRoute} />
-      <QuickSearch T={T} setRoute={setRoute} lang={lang} />
-      <ProductsSection T={{title:T.sections.newTitle, sub:T.sections.newSub}} setRoute={setRoute} setActiveProduct={setActiveProduct} lang={lang} filter={p=>p.status==='new' && p.year===2026} />
-      <PromoSection T={T} lang={lang} />
-      <ProductsSection T={{title:T.sections.bestTitle, sub:T.sections.bestSub}} setRoute={setRoute} setActiveProduct={setActiveProduct} lang={lang} filter={p=>['hot','sale'].includes(p.badge) || [1,2,3].includes(p.id)} />
-      <StoresSection T={T} lang={lang} />
-      <NewsTeaser T={T} lang={lang} setRoute={setRoute} />
+      <HeroComp T={homeT} setRoute={setRoute} />
+      <QuickSearch T={homeT} setRoute={setRoute} lang={lang} />
+      <ProductsSection T={{title:homeT.sections.newTitle, sub:homeT.sections.newSub}} setRoute={setRoute} setActiveProduct={setActiveProduct} lang={lang} filter={p=>p.status==='new' && p.year===2026} />
+      <PromoSection T={homeT} lang={lang} />
+      <ProductsSection T={{title:homeT.sections.bestTitle, sub:homeT.sections.bestSub}} setRoute={setRoute} setActiveProduct={setActiveProduct} lang={lang} filter={p=>['hot','sale'].includes(p.badge) || [1,2,3].includes(p.id)} />
+      <StoresSection T={homeT} lang={lang} />
+      <NewsTeaser T={homeT} lang={lang} setRoute={setRoute} />
       <div className="container">
         <div className="brand-row">
           {window.DTC_DATA.brands.map(b => <div key={b} className="brand-logo-item">{b}</div>)}

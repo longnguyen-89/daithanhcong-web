@@ -35,6 +35,21 @@ const App = () => {
   }, [tweaks.animations]);
 
   useE(() => {
+    const applyAppearance = () => {
+      const appearance = window.DTC_SETTINGS && window.DTC_SETTINGS.appearance;
+      if (!appearance) return;
+      setTweaks({
+        theme: appearance.theme || 'light',
+        heroVariant: appearance.heroVariant || appearance.hero_variant || 'a',
+        animations: appearance.animations !== false
+      });
+    };
+    window.addEventListener('dtc:settings-loaded', applyAppearance);
+    applyAppearance();
+    return () => window.removeEventListener('dtc:settings-loaded', applyAppearance);
+  }, []);
+
+  useE(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [route]);
 
