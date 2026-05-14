@@ -38,7 +38,7 @@ Website chính thức của hệ thống ĐẠI THÀNH CÔNG (ĐTC) — 7 cửa 
 
 ## Phát triển local
 
-Vì là static site, mở file là chạy:
+Vì app dùng Babel Standalone để tải các file `.jsx`, cần chạy qua HTTP server local:
 
 ```bash
 # Cách 1: Python http server

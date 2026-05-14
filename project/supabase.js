@@ -138,7 +138,9 @@ window.dtcSaveSetting = async function(key, value) {
   if (!window.dtcSupabase) throw new Error('Supabase not ready');
   const { error } = await window.dtcSupabase.from('site_settings').upsert({ key, value });
   if (error) throw error;
-  if (window.DTC_SETTINGS) window.DTC_SETTINGS[key] = value;
+  window.DTC_SETTINGS = window.DTC_SETTINGS || {};
+  window.DTC_SETTINGS[key] = value;
+  window.dispatchEvent(new CustomEvent('dtc:settings-loaded'));
   return true;
 };
 

@@ -120,7 +120,7 @@ const ProductsPage = ({ T, lang, setRoute, setActiveProduct }) => {
   );
 };
 
-const DetailPage = ({ p, lang, setRoute }) => {
+const DetailPage = ({ p, lang, setRoute, setActiveProduct }) => {
   const [tab, setTab] = useState(0);
   if (!p) { setRoute('products'); return null; }
   const save = p.oldPrice ? p.oldPrice - p.price : 0;
@@ -192,7 +192,7 @@ const DetailPage = ({ p, lang, setRoute }) => {
         <h2>{lang==='vi'?'Có thể bạn quan tâm':'You may also like'}</h2>
         <div className="products-grid" style={{marginTop:30}}>
           {window.DTC_DATA.products.filter(x=>x.id!==p.id && x.brand===p.brand).slice(0,4).map(x => (
-            <window.DTC_ProductCard key={x.id} p={x} setRoute={setRoute} setActiveProduct={(np)=>{setRoute('detail');}} lang={lang} />
+            <window.DTC_ProductCard key={x.id} p={x} setRoute={setRoute} setActiveProduct={setActiveProduct} lang={lang} />
           ))}
         </div>
       </div>

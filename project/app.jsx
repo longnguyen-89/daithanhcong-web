@@ -120,7 +120,7 @@ const App = () => {
       <main>
         {route === 'home' && <window.DTC_Home T={T} lang={lang} setRoute={setRoute} setActiveProduct={setActiveProduct} heroVariant={heroVariant} />}
         {route === 'products' && <window.DTC_Pages.ProductsPage T={T} lang={lang} setRoute={setRoute} setActiveProduct={setActiveProduct} />}
-        {route === 'detail' && <window.DTC_Pages.DetailPage p={activeProduct} lang={lang} setRoute={setRoute} />}
+        {route === 'detail' && <window.DTC_Pages.DetailPage p={activeProduct} lang={lang} setRoute={setRoute} setActiveProduct={setActiveProduct} />}
         {route === 'news' && <window.DTC_Pages.NewsPage lang={lang} setRoute={setRoute} />}
         {route === 'stores' && <window.DTC_Pages.StoresPage lang={lang} setRoute={setRoute} />}
         {route === 'contact' && <window.DTC_Pages.ContactPage lang={lang} setRoute={setRoute} />}

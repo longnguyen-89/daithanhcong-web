@@ -137,14 +137,25 @@ const __TWEAKS_STYLE = `
 // Single source of truth for tweak values. setTweak persists via the host
 // (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
 function useTweaks(defaults) {
-  const [values, setValues] = React.useState(defaults);
+  const [values, setValues] = React.useState(() => {
+    try {
+      const saved = window.localStorage.getItem('dtc:tweaks');
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch {
+      return defaults;
+    }
+  });
   // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
   // useState-style call doesn't write a "[object Object]" key into the persisted
   // JSON block.
   const setTweak = React.useCallback((keyOrEdits, val) => {
     const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
       ? keyOrEdits : { [keyOrEdits]: val };
-    setValues((prev) => ({ ...prev, ...edits }));
+    setValues((prev) => {
+      const next = { ...prev, ...edits };
+      try { window.localStorage.setItem('dtc:tweaks', JSON.stringify(next)); } catch {}
+      return next;
+    });
     window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
   }, []);
   return [values, setTweak];

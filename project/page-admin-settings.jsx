@@ -25,6 +25,36 @@ const Toast = ({ kind, msg }) => (
 // ============================================
 // AI Settings tab — chỉnh AI từ giao diện
 // ============================================
+const useAutoSaveSetting = (value, saveFn, setBusy, setToast, options = {}) => {
+  const delay = options.delay || 900;
+  const readyRef = React.useRef(false);
+  const saveRef = React.useRef(saveFn);
+  saveRef.current = saveFn;
+
+  React.useEffect(() => {
+    if (!value) return;
+    if (!readyRef.current) {
+      readyRef.current = true;
+      return;
+    }
+
+    setToast({ kind: 'ok', msg: 'Dang tu dong luu...' });
+    const timer = window.setTimeout(async () => {
+      setBusy(true);
+      try {
+        await saveRef.current(value);
+        setToast({ kind: 'ok', msg: options.successMsg || 'Da tu dong luu thay doi.' });
+      } catch (e) {
+        setToast({ kind: 'err', msg: 'Tu dong luu that bai: ' + (e?.message || e) });
+      } finally {
+        setBusy(false);
+      }
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [value, delay, setBusy, setToast, options.successMsg]);
+};
+
 const AdminAISettings = () => {
   const [config, setConfig] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
@@ -33,12 +63,21 @@ const AdminAISettings = () => {
   const [testReply, setTestReply] = React.useState('');
   const [testing, setTesting] = React.useState(false);
 
+  const persistAIConfig = React.useCallback(async (nextConfig) => {
+    await window.dtcSaveSetting('ai_config', nextConfig);
+  }, []);
+
   React.useEffect(() => {
     (async () => {
       const settings = window.DTC_SETTINGS || await window.dtcLoadSettings();
       setConfig(settings.ai_config || {});
     })();
   }, []);
+
+  useAutoSaveSetting(config, persistAIConfig, setBusy, setToast, {
+    delay: 1000,
+    successMsg: 'Da tu dong luu cau hinh AI.'
+  });
 
   if (!config) {
     return <div className="admin-card" style={{padding:40, textAlign:'center', color:'var(--fg-3)'}}>Đang tải cấu hình AI…</div>;
@@ -63,7 +102,7 @@ const AdminAISettings = () => {
   const save = async () => {
     setBusy(true); setToast(null);
     try {
-      await window.dtcSaveSetting('ai_config', config);
+      await persistAIConfig(config);
       setToast({ kind:'ok', msg:'Đã lưu cấu hình AI. Thay đổi áp dụng ngay cho cuộc trò chuyện mới.' });
       setTimeout(() => setToast(null), 4000);
     } catch (e) {
@@ -78,7 +117,7 @@ const AdminAISettings = () => {
     setTesting(true); setTestReply('');
     try {
       // Save first so test uses latest config
-      await window.dtcSaveSetting('ai_config', config);
+      await persistAIConfig(config);
       const r = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,12 +269,21 @@ const AdminSiteInfo = () => {
   const [busy, setBusy] = React.useState(false);
   const [toast, setToast] = React.useState(null);
 
+  const persistBrandInfo = React.useCallback(async (nextInfo) => {
+    await window.dtcSaveSetting('brand_info', nextInfo);
+  }, []);
+
   React.useEffect(() => {
     (async () => {
       const settings = window.DTC_SETTINGS || await window.dtcLoadSettings();
       setInfo(settings.brand_info || {});
     })();
   }, []);
+
+  useAutoSaveSetting(info, persistBrandInfo, setBusy, setToast, {
+    delay: 900,
+    successMsg: 'Da tu dong luu thong tin thuong hieu.'
+  });
 
   if (!info) {
     return <div className="admin-card" style={{padding:40, textAlign:'center', color:'var(--fg-3)'}}>Đang tải…</div>;
@@ -247,7 +295,7 @@ const AdminSiteInfo = () => {
   const save = async () => {
     setBusy(true); setToast(null);
     try {
-      await window.dtcSaveSetting('brand_info', info);
+      await persistBrandInfo(info);
       setToast({ kind: 'ok', msg: 'Đã lưu thông tin thương hiệu.' });
       setTimeout(() => setToast(null), 3500);
     } catch (e) {
