@@ -150,11 +150,34 @@ window.dtcSaveSetting = async function(key, value) {
   return true;
 };
 
+function isMissingGalleryImagesColumn(error) {
+  const message = error?.message || '';
+  return error?.code === '42703'
+    || error?.code === 'PGRST204'
+    || /gallery_images/i.test(message);
+}
+
+async function withGalleryImagesFallback(fields, action) {
+  const result = await action(fields);
+  if (!result?.error || !fields || !Object.prototype.hasOwnProperty.call(fields, 'gallery_images')) return result;
+  if (!isMissingGalleryImagesColumn(result.error)) return result;
+  const { gallery_images, ...fallbackFields } = fields;
+  const retry = await action(fallbackFields);
+  if (!retry?.error) {
+    console.warn('[DTC] gallery_images column is not migrated yet; saved without gallery list.');
+  }
+  return retry;
+}
+
 window.dtcCreateNews = async function(fields) {
-  return window.dtcSupabase.from('news').insert([fields]).select().single();
+  return withGalleryImagesFallback(fields, (nextFields) =>
+    window.dtcSupabase.from('news').insert([nextFields]).select().single()
+  );
 };
 window.dtcUpdateNews = async function(id, fields) {
-  return window.dtcSupabase.from('news').update(fields).eq('id', id).select().single();
+  return withGalleryImagesFallback(fields, (nextFields) =>
+    window.dtcSupabase.from('news').update(nextFields).eq('id', id).select().single()
+  );
 };
 window.dtcDeleteNews = async function(id) {
   return window.dtcSupabase.from('news').update({ published: false }).eq('id', id);
@@ -236,10 +259,14 @@ window.dtcDeleteStore = async function(id) {
 };
 
 window.dtcUpdateProduct = async function(id, fields) {
-  return window.dtcSupabase.from('products').update(fields).eq('id', id).select().single();
+  return withGalleryImagesFallback(fields, (nextFields) =>
+    window.dtcSupabase.from('products').update(nextFields).eq('id', id).select().single()
+  );
 };
 window.dtcCreateProduct = async function(fields) {
-  return window.dtcSupabase.from('products').insert([fields]).select().single();
+  return withGalleryImagesFallback(fields, (nextFields) =>
+    window.dtcSupabase.from('products').insert([nextFields]).select().single()
+  );
 };
 window.dtcDeleteProduct = async function(id) {
   return window.dtcSupabase.from('products').update({ is_active: false }).eq('id', id);
