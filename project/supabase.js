@@ -18,6 +18,8 @@ window.DTC_CONFIG = {
 })();
 
 function mapProduct(row, storeMap) {
+  const galleryImages = Array.isArray(row.gallery_images) ? row.gallery_images.filter(Boolean) : [];
+  const primaryImage = row.image_url || galleryImages[0] || null;
   return {
     id: row.id,
     name: row.name,
@@ -36,7 +38,8 @@ function mapProduct(row, storeMap) {
     mileage: row.mileage,
     fuel: row.fuel,
     features: Array.isArray(row.features) ? row.features : [],
-    image: row.image_url || null
+    image: primaryImage,
+    images: Array.from(new Set([primaryImage, ...galleryImages].filter(Boolean)))
   };
 }
 
@@ -53,6 +56,8 @@ function mapStore(row) {
 }
 
 function mapNews(row) {
+  const galleryImages = Array.isArray(row.gallery_images) ? row.gallery_images.filter(Boolean) : [];
+  const coverImage = row.cover_url || galleryImages[0] || null;
   return {
     id: row.id,
     cat: row.cat,
@@ -60,8 +65,9 @@ function mapNews(row) {
     excerpt: row.excerpt,
     content: row.content,
     author: row.author,
-    cover: row.cover_url || null,
-    cover_url: row.cover_url || null,
+    cover: coverImage,
+    cover_url: coverImage,
+    images: Array.from(new Set([coverImage, ...galleryImages].filter(Boolean))),
     date: new Date(row.published_at).toLocaleDateString('vi-VN'),
     published: row.published
   };

@@ -76,6 +76,12 @@ const QualityTags = ({ items }) => {
   );
 };
 
+const normalizeImages = (items) => Array.from(new Set(
+  (items || []).map(v => String(v || '').trim()).filter(Boolean)
+));
+
+const getFileList = (files) => Array.from(files || []).filter(file => file && file.type?.startsWith('image/'));
+
 const AdminDashboard = ({ orders }) => {
   const D = window.DTC_DATA;
   const months = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
@@ -562,6 +568,7 @@ const StoreModal = ({ data, close, onSaved }) => {
 
 const ProductModal = ({ data, close }) => {
   const D = window.DTC_DATA;
+  const existingImages = normalizeImages([data?.image, ...(data?.images || [])]);
   const [form, setForm] = useState({
     name: data?.name || '',
     brand: data?.brand || D.brands[0],
@@ -576,7 +583,8 @@ const ProductModal = ({ data, close }) => {
     store_id: data?.storeId || D.stores[0]?.id,
     fuel: data?.fuel || 'Xăng',
     features: (data?.features || []).join('\n'),
-    image_url: data?.image || ''
+    image_url: data?.image || existingImages[0] || '',
+    gallery_images: existingImages
   });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -584,15 +592,40 @@ const ProductModal = ({ data, close }) => {
   const fileInputRef = React.useRef(null);
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleFile = async (file) => {
-    if (!file) return;
+  const addImages = (urls) => {
+    const cleanUrls = normalizeImages(urls);
+    if (!cleanUrls.length) return;
+    setForm(f => {
+      const gallery = normalizeImages([...(f.gallery_images || []), ...cleanUrls]);
+      return { ...f, gallery_images: gallery, image_url: f.image_url || gallery[0] || '' };
+    });
+  };
+  const setPrimaryImage = (url) => {
+    setForm(f => ({ ...f, image_url: url, gallery_images: normalizeImages([url, ...(f.gallery_images || [])]) }));
+  };
+  const removeImage = (url) => {
+    setForm(f => {
+      const gallery = normalizeImages(f.gallery_images).filter(item => item !== url);
+      const image_url = f.image_url === url ? (gallery[0] || '') : (gallery.includes(f.image_url) ? f.image_url : gallery[0] || '');
+      return { ...f, gallery_images: gallery, image_url };
+    });
+  };
+
+  const handleFiles = async (files) => {
+    const list = getFileList(files);
+    if (!list.length) return;
     setUploading(true);
     setErr('');
+    const uploaded = [];
     try {
-      const { url } = await window.dtcUploadImage(file, 'products');
-      upd('image_url', url);
+      for (const file of list) {
+        const { url } = await window.dtcUploadImage(file, 'products');
+        uploaded.push(url);
+      }
+      addImages(uploaded);
     } catch (e) {
       setErr('Upload thất bại: ' + (e?.message || e));
+      addImages(uploaded);
     } finally {
       setUploading(false);
     }
@@ -605,6 +638,7 @@ const ProductModal = ({ data, close }) => {
     }
     setBusy(true); setErr('');
     try {
+      const galleryImages = normalizeImages([form.image_url, ...(form.gallery_images || [])]);
       const payload = {
         name: form.name.trim(),
         brand: form.brand,
@@ -619,7 +653,8 @@ const ProductModal = ({ data, close }) => {
         store_id: Number(form.store_id) || null,
         fuel: form.fuel,
         features: form.features.split('\n').map(s => s.trim()).filter(Boolean),
-        image_url: form.image_url || null,
+        image_url: form.image_url || galleryImages[0] || null,
+        gallery_images: galleryImages,
         is_active: true
       };
       if (data?.id) {
@@ -642,6 +677,8 @@ const ProductModal = ({ data, close }) => {
   const selectedCategory = D.categories.find(c => c.id === form.cat)?.vi || form.cat;
   const selectedStore = D.stores.find(s => String(s.id) === String(form.store_id));
   const stockNumber = Number(form.stock) || 0;
+  const galleryImages = normalizeImages([form.image_url, ...(form.gallery_images || [])]);
+  const previewImage = form.image_url || galleryImages[0] || '';
 
   return (
   <div className="modal-overlay" onClick={close}>
@@ -653,8 +690,8 @@ const ProductModal = ({ data, close }) => {
       <div className="modal-body">
         {err && <div style={{padding:'10px 14px', marginBottom:12, background:'rgba(200,16,46,0.1)', color:'var(--crimson)', borderRadius:8, fontSize:13}}>{err}</div>}
         <div className="editor-live-preview product-preview">
-          <div className="elp-media" style={form.image_url ? {backgroundImage:`url(${form.image_url})`} : null}>
-            {!form.image_url && <Icon name="box" size={30} />}
+          <div className="elp-media" style={previewImage ? {backgroundImage:`url(${previewImage})`} : null}>
+            {!previewImage && <Icon name="box" size={30} />}
           </div>
           <div className="elp-body">
             <div className="elp-label">Preview sản phẩm</div>
@@ -669,12 +706,12 @@ const ProductModal = ({ data, close }) => {
             <QualityTags items={[
               !form.name.trim() && { label: 'Thiếu tên', tone: 'danger' },
               !form.price && { label: 'Thiếu giá', tone: 'danger' },
-              !form.image_url && { label: 'Thiếu ảnh', tone: 'warn' },
+              !galleryImages.length && { label: 'Thiếu ảnh', tone: 'warn' },
               stockNumber <= 5 && { label: 'Sắp hết hàng', tone: 'warn' },
               !previewFeatures.length && { label: 'Thiếu tính năng', tone: 'warn' }
             ]} />
             <div className="elp-note">
-              {selectedStore ? selectedStore.name : 'Chưa gán chi nhánh'} · {previewFeatures.length || 0} tính năng
+              {selectedStore ? selectedStore.name : 'Chưa gán chi nhánh'} · {previewFeatures.length || 0} tính năng · {galleryImages.length || 0} ảnh
             </div>
           </div>
         </div>
@@ -726,30 +763,41 @@ const ProductModal = ({ data, close }) => {
         </div>
         <div className="form-row full">
           <div>
-            <label className="label">Ảnh xe</label>
-            <div className="upload-zone" style={{position:'relative', cursor:'pointer'}}
+            <label className="label">
+              <span>Ảnh xe</span>
+              <span className="label-hint">Nên dùng 1600x1200px · tỉ lệ 4:3 · WebP/JPG dưới 5MB</span>
+            </label>
+            <div className="upload-zone upload-zone-compact" style={{position:'relative', cursor:'pointer'}}
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); }}
-              onDrop={(e) => { e.preventDefault(); handleFile(e.dataTransfer.files?.[0]); }}>
-              {form.image_url ? (
-                <div style={{display:'flex', gap:14, alignItems:'center'}}>
-                  <img src={form.image_url} alt="" style={{width:120, height:90, objectFit:'cover', borderRadius:6, border:'1px solid var(--border)'}} />
-                  <div style={{textAlign:'left', flex:1}}>
-                    <div style={{fontWeight:600, color:'var(--fg)', fontSize:13}}>Ảnh hiện tại — click để đổi</div>
-                    <div style={{fontSize:11, marginTop:4, color:'var(--fg-3)', wordBreak:'break-all'}}>{form.image_url.split('/').pop()}</div>
-                    <button type="button" className="btn btn-ghost" style={{marginTop:8, padding:'4px 10px', fontSize:11}}
-                      onClick={(e) => { e.stopPropagation(); upd('image_url', ''); }}>Xóa ảnh</button>
+              onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}>
+              <div className="uz-icon"><Icon name="upload" size={26} /></div>
+              <div style={{fontWeight:600, color:'var(--fg)'}}>{uploading ? 'Đang upload ảnh…' : 'Kéo thả nhiều ảnh hoặc click để upload'}</div>
+              <div style={{fontSize:12, marginTop:4}}>Ảnh đầu tiên hoặc ảnh được đặt chính sẽ hiện ngoài danh sách sản phẩm.</div>
+              <input ref={fileInputRef} type="file" accept="image/*" multiple style={{display:'none'}}
+                onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} />
+            </div>
+            <input className="input image-url-input" placeholder="Hoặc dán URL ảnh chính trực tiếp..."
+              value={form.image_url}
+              onChange={e=>upd('image_url', e.target.value)}
+              onBlur={()=>addImages([form.image_url])} />
+            {galleryImages.length > 0 && (
+              <div className="image-thumbs image-manager">
+                {galleryImages.map((url, i) => (
+                  <div key={url} className={`it ${url === form.image_url ? 'primary' : ''}`} style={{backgroundImage:`url(${url})`, backgroundSize:'cover', backgroundPosition:'center'}}>
+                    {url === form.image_url && <span className="primary-badge">Chính</span>}
+                    <div className="thumb-actions">
+                      {url !== form.image_url && <button type="button" onClick={() => setPrimaryImage(url)}>Đặt chính</button>}
+                      <button type="button" onClick={() => removeImage(url)}>Xóa</button>
+                    </div>
+                    <span className="thumb-index">{i + 1}</span>
                   </div>
-                </div>
-              ) : (
-                <>
-                  <div className="uz-icon"><Icon name="upload" size={28} /></div>
-                  <div style={{fontWeight:600, color:'var(--fg)'}}>{uploading ? 'Đang upload…' : 'Kéo thả hoặc click để upload'}</div>
-                  <div style={{fontSize:12, marginTop:4}}>PNG, JPG, WebP · Tối đa 5MB</div>
-                </>
-              )}
-              <input ref={fileInputRef} type="file" accept="image/*" style={{display:'none'}}
-                onChange={(e) => handleFile(e.target.files?.[0])} />
+                ))}
+                <button type="button" className="it add" onClick={() => fileInputRef.current?.click()} title="Thêm ảnh"><Icon name="plus" size={20} /></button>
+              </div>
+            )}
+            <div className="media-helper">
+              Gợi ý: chụp ngang đủ sáng, xe chiếm 75-85% khung hình; thêm 3-6 ảnh gồm góc trước, hông, sau, đồng hồ ODO và chi tiết tem/mâm để trang chi tiết nhìn đầy đủ hơn.
             </div>
           </div>
         </div>
@@ -773,20 +821,48 @@ const ProductModal = ({ data, close }) => {
 
 const NewsModal = ({ data, close, onSaved }) => {
   const cats = ['Khuyến mãi', 'Cẩm nang', 'Tin hãng', 'Sự kiện'];
+  const existingImages = normalizeImages([data?.cover_url || data?.cover, ...(data?.images || [])]);
   const [form, setForm] = useState({
     title: data?.title || '',
     cat: data?.cat || cats[0],
     author: data?.author || 'Phòng Marketing',
     excerpt: data?.excerpt || '',
     content: data?.content || '',
-    cover_url: data?.cover_url || data?.cover || '',
+    cover_url: data?.cover_url || data?.cover || existingImages[0] || '',
+    gallery_images: existingImages,
     published: data?.published !== false
   });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState('');
   const fileRef = React.useRef(null);
+  const galleryRef = React.useRef(null);
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const addNewsImages = (urls) => {
+    const cleanUrls = normalizeImages(urls);
+    if (!cleanUrls.length) return;
+    setForm(f => {
+      const gallery = normalizeImages([...(f.gallery_images || []), ...cleanUrls]);
+      return { ...f, gallery_images: gallery, cover_url: f.cover_url || gallery[0] || '' };
+    });
+  };
+  const setCoverImage = (url) => {
+    setForm(f => ({ ...f, cover_url: url, gallery_images: normalizeImages([url, ...(f.gallery_images || [])]) }));
+  };
+  const removeNewsImage = (url) => {
+    setForm(f => {
+      const gallery = normalizeImages(f.gallery_images).filter(item => item !== url);
+      const cover_url = f.cover_url === url ? (gallery[0] || '') : (gallery.includes(f.cover_url) ? f.cover_url : gallery[0] || '');
+      return { ...f, gallery_images: gallery, cover_url };
+    });
+  };
+  const insertImageToContent = (url) => {
+    setForm(f => ({
+      ...f,
+      content: `${(f.content || '').trimEnd()}\n\n![Ảnh bài viết](${url})\n`
+    }));
+  };
 
   const handleCover = async (file) => {
     if (!file) return;
@@ -794,9 +870,29 @@ const NewsModal = ({ data, close, onSaved }) => {
     setErr('');
     try {
       const { url } = await window.dtcUploadImage(file, 'news');
-      upd('cover_url', url);
+      setCoverImage(url);
     } catch (e) {
       setErr('Upload thất bại: ' + (e?.message || e));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleNewsImages = async (files) => {
+    const list = getFileList(files);
+    if (!list.length) return;
+    setUploading(true);
+    setErr('');
+    const uploaded = [];
+    try {
+      for (const file of list) {
+        const { url } = await window.dtcUploadImage(file, 'news');
+        uploaded.push(url);
+      }
+      addNewsImages(uploaded);
+    } catch (e) {
+      setErr('Upload thất bại: ' + (e?.message || e));
+      addNewsImages(uploaded);
     } finally {
       setUploading(false);
     }
@@ -809,13 +905,15 @@ const NewsModal = ({ data, close, onSaved }) => {
     }
     setBusy(true); setErr('');
     try {
+      const galleryImages = normalizeImages([form.cover_url, ...(form.gallery_images || [])]);
       const payload = {
         title: form.title.trim(),
         cat: form.cat,
         author: form.author.trim() || 'Phòng Marketing',
         excerpt: form.excerpt.trim() || null,
         content: form.content || null,
-        cover_url: form.cover_url || null,
+        cover_url: form.cover_url || galleryImages[0] || null,
+        gallery_images: galleryImages,
         published: publishImmediate !== undefined ? publishImmediate : form.published
       };
       if (data?.id) {
@@ -836,6 +934,7 @@ const NewsModal = ({ data, close, onSaved }) => {
 
   const excerptLength = form.excerpt.trim().length;
   const contentLength = form.content.trim().length;
+  const newsImages = normalizeImages([form.cover_url, ...(form.gallery_images || [])]);
 
   return (
   <div className="modal-overlay" onClick={close}>
@@ -857,11 +956,12 @@ const NewsModal = ({ data, close, onSaved }) => {
             <p>{form.excerpt.trim() || 'Phần tóm tắt giúp bài viết rõ hơn ở danh sách tin tức.'}</p>
             <QualityTags items={[
               !form.title.trim() && { label: 'Thiếu tiêu đề', tone: 'danger' },
-              !form.cover_url && { label: 'Thiếu ảnh bìa', tone: 'warn' },
+              !newsImages.length && { label: 'Thiếu ảnh bìa', tone: 'warn' },
               excerptLength < 60 && { label: 'Tóm tắt ngắn', tone: 'warn' },
               contentLength < 160 && { label: 'Nội dung ngắn', tone: 'warn' },
               !form.published && { label: 'Đang lưu nháp', tone: 'muted' }
             ]} />
+            <div className="elp-note">{newsImages.length || 0} ảnh đã gắn với bài viết</div>
           </div>
         </div>
 
@@ -879,8 +979,11 @@ const NewsModal = ({ data, close, onSaved }) => {
 
         <div className="form-row full">
           <div>
-            <label className="label">Ảnh bìa</label>
-            <div className="upload-zone" style={{cursor:'pointer'}}
+            <label className="label">
+              <span>Ảnh bìa</span>
+              <span className="label-hint">Nên dùng 1600x900px · tỉ lệ 16:9 · WebP/JPG dưới 5MB</span>
+            </label>
+            <div className="upload-zone upload-zone-compact" style={{cursor:'pointer'}}
               onClick={() => fileRef.current?.click()}
               onDragOver={e => e.preventDefault()}
               onDrop={e => { e.preventDefault(); handleCover(e.dataTransfer.files?.[0]); }}>
@@ -899,7 +1002,52 @@ const NewsModal = ({ data, close, onSaved }) => {
                   <div style={{fontWeight:600, color:'var(--fg)'}}>{uploading ? 'Đang upload…' : 'Tải ảnh bìa (PNG/JPG/WebP, ≤5MB)'}</div>
                 </>
               )}
-              <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>handleCover(e.target.files?.[0])} />
+              <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{handleCover(e.target.files?.[0]); e.target.value = '';}} />
+            </div>
+            <input className="input image-url-input" placeholder="Hoặc dán URL ảnh bìa trực tiếp..."
+              value={form.cover_url}
+              onChange={e=>upd('cover_url', e.target.value)}
+              onBlur={()=>addNewsImages([form.cover_url])} />
+            <div className="media-helper">
+              Ảnh bìa sẽ bị crop về 16:9 trên danh sách tin tức; đặt chữ hoặc logo cách mép ít nhất 120px để không bị cắt trên mobile.
+            </div>
+          </div>
+        </div>
+
+        <div className="form-row full">
+          <div>
+            <label className="label">
+              <span>Ảnh nội dung</span>
+              <span className="label-hint">Nên rộng 1200-1600px · dùng để chèn vào bài</span>
+            </label>
+            <div className="upload-zone upload-zone-compact" style={{cursor:'pointer'}}
+              onClick={() => galleryRef.current?.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); handleNewsImages(e.dataTransfer.files); }}>
+              <div className="uz-icon"><Icon name="upload" size={26} /></div>
+              <div style={{fontWeight:600, color:'var(--fg)'}}>{uploading ? 'Đang upload ảnh…' : 'Kéo thả nhiều ảnh hoặc click để upload'}</div>
+              <div style={{fontSize:12, marginTop:4}}>Có thể đặt làm ảnh bìa hoặc chèn trực tiếp vào nội dung Markdown.</div>
+              <input ref={galleryRef} type="file" accept="image/*" multiple style={{display:'none'}}
+                onChange={e=>{handleNewsImages(e.target.files); e.target.value = '';}} />
+            </div>
+            {newsImages.length > 0 && (
+              <div className="image-thumbs image-manager news-image-manager">
+                {newsImages.map((url, i) => (
+                  <div key={url} className={`it ${url === form.cover_url ? 'primary' : ''}`} style={{backgroundImage:`url(${url})`, backgroundSize:'cover', backgroundPosition:'center'}}>
+                    {url === form.cover_url && <span className="primary-badge">Bìa</span>}
+                    <div className="thumb-actions">
+                      {url !== form.cover_url && <button type="button" onClick={() => setCoverImage(url)}>Đặt bìa</button>}
+                      <button type="button" onClick={() => insertImageToContent(url)}>Chèn</button>
+                      <button type="button" onClick={() => removeNewsImage(url)}>Xóa</button>
+                    </div>
+                    <span className="thumb-index">{i + 1}</span>
+                  </div>
+                ))}
+                <button type="button" className="it add" onClick={() => galleryRef.current?.click()} title="Thêm ảnh"><Icon name="plus" size={20} /></button>
+              </div>
+            )}
+            <div className="media-helper">
+              Gợi ý: ảnh bài viết nên cùng tông sáng với ảnh bìa, không để chữ nhỏ trong ảnh; mỗi bài nên có 1 ảnh bìa và 2-5 ảnh minh họa nếu bài dài.
             </div>
           </div>
         </div>

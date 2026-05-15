@@ -124,6 +124,8 @@ const DetailPage = ({ p, lang, setRoute, setActiveProduct }) => {
   const [tab, setTab] = useState(0);
   if (!p) { setRoute('products'); return null; }
   const save = p.oldPrice ? p.oldPrice - p.price : 0;
+  const galleryImages = (p.images && p.images.length ? p.images : [p.image]).filter(Boolean);
+  const activeImage = galleryImages[tab] || galleryImages[0] || '';
   return (
     <div className="page-fade">
       <div className="page-hero" style={{padding:'40px 0'}}>
@@ -137,16 +139,19 @@ const DetailPage = ({ p, lang, setRoute, setActiveProduct }) => {
       <div className="container">
         <div className="detail-layout">
           <div className="gallery">
-            <div className="main-img" style={p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center'} : null}>
-              {!p.image && p.name}
+            <div className="main-img" style={activeImage ? {backgroundImage:`url(${activeImage})`, backgroundSize:'cover', backgroundPosition:'center'} : null}>
+              {!activeImage && p.name}
             </div>
-            <div className="thumbs">
-              {[0,1,2,3].map(i => (
-                <div key={i} className={`thumb ${i===tab?'active':''}`}
-                  style={p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center', opacity: i===tab ? 1 : 0.55} : null}
-                  onClick={()=>setTab(i)}></div>
-              ))}
-            </div>
+            {galleryImages.length > 1 && (
+              <div className="thumbs">
+                {galleryImages.map((url, i) => (
+                  <button key={url} className={`thumb ${i===tab?'active':''}`}
+                    style={{backgroundImage:`url(${url})`, backgroundSize:'cover', backgroundPosition:'center', opacity: i===tab ? 1 : 0.65}}
+                    onClick={()=>setTab(i)}
+                    title={`${lang==='vi'?'Xem ảnh':'View image'} ${i + 1}`}></button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="detail-info">
             <div className="brand-line">{p.brand} · {p.year} · {p.status==='used'?(lang==='vi'?'Đã qua sử dụng':'Used'):(lang==='vi'?'Xe mới 100%':'Brand new')}</div>

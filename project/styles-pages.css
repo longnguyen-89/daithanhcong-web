@@ -140,6 +140,8 @@
   background: repeating-linear-gradient(135deg, var(--bg-3) 0, var(--bg-3) 8px, var(--bg-2) 8px, var(--bg-2) 16px);
   cursor: pointer;
   border: 2px solid transparent;
+  display: block;
+  width: 100%;
 }
 .gallery .thumbs .thumb.active { border-color: var(--burgundy); }
 .detail-info .brand-line {
@@ -1225,6 +1227,17 @@
 .modal-body { padding: 28px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 .form-row.full { grid-template-columns: 1fr; }
+.modal-body .label .label-hint {
+  display: block;
+  margin-top: 4px;
+  color: var(--fg-3);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+}
 .upload-zone {
   border: 2px dashed var(--border);
   border-radius: var(--r-md);
@@ -1237,6 +1250,19 @@
 }
 .upload-zone:hover { border-color: var(--burgundy); color: var(--burgundy); background: rgba(140,0,0,0.04); }
 .upload-zone .uz-icon { font-size: 32px; margin-bottom: 8px; }
+.upload-zone-compact {
+  padding: 20px;
+}
+.media-helper {
+  margin-top: 8px;
+  color: var(--fg-3);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.image-url-input {
+  margin-top: 10px;
+  font-size: 12px;
+}
 .image-thumbs {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1249,12 +1275,63 @@
   border-radius: 6px;
   position: relative;
   border: 1px solid var(--border);
+  overflow: hidden;
 }
 .image-thumbs .it.add {
   display: grid; place-items: center;
   cursor: pointer;
   color: var(--fg-3);
   font-size: 22px;
+}
+.image-manager {
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+}
+.image-manager .it {
+  aspect-ratio: 4 / 3;
+}
+.image-manager .it.primary {
+  border-color: var(--burgundy);
+  box-shadow: inset 0 0 0 2px var(--burgundy);
+}
+.image-manager .primary-badge,
+.image-manager .thumb-index {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--burgundy);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.image-manager .thumb-index {
+  left: auto;
+  right: 6px;
+  background: rgba(0,0,0,0.55);
+}
+.image-manager .thumb-actions {
+  position: absolute;
+  inset: auto 6px 6px;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.image-manager .thumb-actions button {
+  border-radius: 5px;
+  background: rgba(20,20,20,0.72);
+  color: #fff;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+}
+.image-manager .thumb-actions button:hover {
+  background: var(--burgundy);
+}
+.news-image-manager .it {
+  aspect-ratio: 16 / 9;
 }
 
 /* Branch cards */
