@@ -76,8 +76,10 @@ const App = () => {
     if (window.dtcOnAuthChange) {
       unsub = window.dtcOnAuthChange(async (sess) => {
         if (!sess) { setSession(null); return; }
-        const s = await window.dtcGetSession();
-        setSession(s);
+        // Use the session passed by the listener directly; only fetch the profile.
+        // Calling getSession() again from this path can deadlock supabase-js.
+        const profile = await window.dtcGetProfile(sess.user.id);
+        setSession({ session: sess, profile });
       });
     }
     return unsub;

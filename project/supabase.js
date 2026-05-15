@@ -162,19 +162,33 @@ window.dtcSignOut = async function() {
   return window.dtcSupabase.auth.signOut();
 };
 
+window.dtcGetProfile = async function(userId) {
+  if (!window.dtcSupabase || !userId) return null;
+  const { data, error } = await window.dtcSupabase
+    .from('profiles').select('*').eq('id', userId).maybeSingle();
+  if (error) {
+    console.warn('[DTC] Could not load profile:', error.message);
+    return null;
+  }
+  return data || null;
+};
+
 window.dtcGetSession = async function() {
   if (!window.dtcSupabase) return null;
   const { data } = await window.dtcSupabase.auth.getSession();
   if (!data?.session) return null;
-  const userId = data.session.user.id;
-  const { data: profile } = await window.dtcSupabase
-    .from('profiles').select('*').eq('id', userId).maybeSingle();
+  const profile = await window.dtcGetProfile(data.session.user.id);
   return { session: data.session, profile };
 };
 
 window.dtcOnAuthChange = function(cb) {
   if (!window.dtcSupabase) return () => {};
-  const { data } = window.dtcSupabase.auth.onAuthStateChange((_event, session) => cb(session));
+  // Defer the callback to avoid Supabase auth deadlock — calling auth methods or
+  // DB queries synchronously inside onAuthStateChange holds an internal lock and
+  // hangs subsequent auth.getSession() calls.
+  const { data } = window.dtcSupabase.auth.onAuthStateChange((_event, session) => {
+    setTimeout(() => cb(session), 0);
+  });
   return () => data.subscription.unsubscribe();
 };
 
