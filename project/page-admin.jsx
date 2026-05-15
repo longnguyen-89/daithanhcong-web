@@ -2,15 +2,20 @@
 const { Icon, BikePlaceholder } = window.DTC_Components;
 
 const AdminSidebar = ({ tab, setTab, setRoute }) => {
+  const D = window.DTC_DATA || {};
+  const products = D.products || [];
+  const news = D.news || [];
+  const stores = D.stores || [];
+  const orders = D.orders || [];
   const items = [
     { section: 'TỔNG QUAN' },
     { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
     { section: 'NỘI DUNG' },
-    { id: 'products', label: 'Sản phẩm xe', icon: 'box', count: 12 },
-    { id: 'news', label: 'Tin tức / Khuyến mãi', icon: 'edit', count: 6 },
+    { id: 'products', label: 'Sản phẩm xe', icon: 'box', count: products.length },
+    { id: 'news', label: 'Tin tức / Khuyến mãi', icon: 'edit', count: news.length },
     { section: 'KINH DOANH' },
-    { id: 'orders', label: 'Đơn hàng / Tư vấn', icon: 'cart', count: 7 },
-    { id: 'branches', label: 'Chi nhánh', icon: 'map', count: 7 },
+    { id: 'orders', label: 'Đơn hàng / Tư vấn', icon: 'cart', count: orders.length },
+    { id: 'branches', label: 'Chi nhánh', icon: 'map', count: stores.length },
     { section: 'HỆ THỐNG' },
     { id: 'ai', label: 'Trợ lý AI', icon: 'chat' },
     { id: 'settings', label: 'Thông tin chung', icon: 'settings' },
@@ -48,6 +53,27 @@ const AdminSidebar = ({ tab, setTab, setRoute }) => {
 const StatusPill = ({ s }) => {
   const map = { pending: 'Chờ xử lý', confirmed: 'Đã xác nhận', delivered: 'Đã giao', cancelled: 'Đã hủy' };
   return <span className={`status-pill ${s}`}>{map[s]}</span>;
+};
+
+const AdminMetricStrip = ({ items }) => (
+  <div className="admin-metric-strip">
+    {items.map((item) => (
+      <div key={item.label} className={`admin-mini-metric ${item.tone || ''}`}>
+        <span>{item.label}</span>
+        <strong>{item.value}</strong>
+      </div>
+    ))}
+  </div>
+);
+
+const QualityTags = ({ items }) => {
+  const visible = items.filter(Boolean);
+  if (!visible.length) return <span className="quality-tag ok">Sẵn sàng hiển thị</span>;
+  return (
+    <div className="quality-tags">
+      {visible.map((item, i) => <span key={i} className={`quality-tag ${item.tone || 'warn'}`}>{item.label}</span>)}
+    </div>
+  );
 };
 
 const AdminDashboard = ({ orders }) => {
@@ -124,9 +150,25 @@ const AdminDashboard = ({ orders }) => {
 
 const AdminProducts = ({ openModal }) => {
   const D = window.DTC_DATA;
+  const [query, setQuery] = useState('');
   const [filterBrand, setFilterBrand] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStock, setFilterStock] = useState('all');
   const [, force] = useState(0);
-  const list = filterBrand === 'all' ? D.products : D.products.filter(p => p.brand === filterBrand);
+  const normalizedQuery = query.trim().toLowerCase();
+  const list = D.products.filter(p => {
+    const byQuery = !normalizedQuery || [p.name, p.brand, p.color, p.store].join(' ').toLowerCase().includes(normalizedQuery);
+    const byBrand = filterBrand === 'all' || p.brand === filterBrand;
+    const byStatus = filterStatus === 'all' || p.status === filterStatus;
+    const byStock = filterStock === 'all'
+      || (filterStock === 'low' && Number(p.stock) <= 5)
+      || (filterStock === 'missing-image' && !p.image)
+      || (filterStock === 'ready' && Number(p.stock) > 5 && p.image);
+    return byQuery && byBrand && byStatus && byStock;
+  });
+  const missingImages = D.products.filter(p => !p.image).length;
+  const lowStock = D.products.filter(p => Number(p.stock) <= 5).length;
+  const usedCount = D.products.filter(p => p.status === 'used').length;
 
   const removeProduct = async (p) => {
     if (!confirm(`Ẩn sản phẩm "${p.name}" khỏi website? (có thể bật lại trong DB)`)) return;
@@ -141,35 +183,69 @@ const AdminProducts = ({ openModal }) => {
   };
 
   return (
-    <div className="page-fade admin-card">
-      <div className="admin-card-head">
-        <h3>Quản lý sản phẩm xe ({list.length})</h3>
-        <div style={{display:'flex', gap:8}}>
-          <select className="select" style={{width:160, padding:'8px 12px'}}
-            value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
+    <div className="page-fade admin-content-stack">
+      <AdminMetricStrip items={[
+        { label: 'Tổng sản phẩm', value: D.products.length },
+        { label: 'Sắp hết hàng', value: lowStock, tone: lowStock ? 'warn' : 'ok' },
+        { label: 'Thiếu ảnh', value: missingImages, tone: missingImages ? 'danger' : 'ok' },
+        { label: 'Xe đã qua sử dụng', value: usedCount }
+      ]} />
+
+      <div className="admin-card">
+        <div className="admin-card-head content-head">
+          <div>
+            <h3>Quản lý sản phẩm xe ({list.length})</h3>
+            <p>Tìm, lọc và kiểm tra nhanh dữ liệu hiển thị ngoài website.</p>
+          </div>
+          <button className="btn btn-primary" onClick={()=>openModal('product')}><Icon name="plus" size={14} />Thêm xe mới</button>
+        </div>
+        <div className="content-toolbar">
+          <div className="admin-search-field">
+            <Icon name="search" size={14} />
+            <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm theo tên xe, hãng, màu, chi nhánh..." />
+          </div>
+          <select className="select" value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
             <option value="all">Tất cả hãng</option>
             {D.brands.map(b=><option key={b} value={b}>{b}</option>)}
           </select>
-          <button className="btn btn-primary" onClick={()=>openModal('product')}><Icon name="plus" size={14} />Thêm xe mới</button>
+          <select className="select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+            <option value="all">Mới & cũ</option>
+            <option value="new">Xe mới</option>
+            <option value="used">Xe đã qua sử dụng</option>
+          </select>
+          <select className="select" value={filterStock} onChange={e => setFilterStock(e.target.value)}>
+            <option value="all">Tất cả chất lượng</option>
+            <option value="ready">Sẵn sàng hiển thị</option>
+            <option value="low">Sắp hết hàng</option>
+            <option value="missing-image">Thiếu ảnh</option>
+          </select>
         </div>
-      </div>
       <table className="admin-table">
-        <thead><tr><th>Sản phẩm</th><th>Hãng</th><th>Loại</th><th>Giá</th><th>Tồn kho</th><th>Chi nhánh</th><th>Trạng thái</th><th></th></tr></thead>
+        <thead><tr><th>Sản phẩm</th><th>Hãng</th><th>Loại</th><th>Giá</th><th>Tồn kho</th><th>Chất lượng dữ liệu</th><th></th></tr></thead>
         <tbody>
+          {list.length === 0 && (
+            <tr><td colSpan={7} className="admin-empty-cell">Không tìm thấy sản phẩm phù hợp bộ lọc.</td></tr>
+          )}
           {list.map(p => (
             <tr key={p.id}>
               <td>
                 <div className="product-cell">
-                  <div className="mini-img" style={p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center', background: undefined} : null}></div>
-                  <div><div className="pname">{p.name}</div><div className="pmeta">ID #{p.id} · {p.year} · {p.color}</div></div>
+                  <div className="mini-img" style={p.image ? {backgroundImage:`url(${p.image})`, backgroundSize:'cover', backgroundPosition:'center'} : null}></div>
+                  <div><div className="pname">{p.name}</div><div className="pmeta">ID #{p.id} · {p.year} · {p.color || 'chưa có màu'} · {p.store || 'chưa gán chi nhánh'}</div></div>
                 </div>
               </td>
               <td>{p.brand}</td>
               <td style={{fontSize:12}}>{D.categories.find(c=>c.id===p.cat)?.vi}</td>
               <td style={{fontFamily:'var(--font-display)', fontWeight:700, color:'var(--burgundy)'}}>{window.formatVND(p.price)}</td>
               <td><span className="badge badge-stock">{p.stock} xe</span></td>
-              <td style={{fontSize:12}}>{p.store}</td>
-              <td>{p.status==='new' ? <span className="badge badge-new">MỚI</span> : <span className="badge badge-used">CŨ</span>}</td>
+              <td>
+                <QualityTags items={[
+                  !p.image && { label: 'Thiếu ảnh', tone: 'danger' },
+                  Number(p.stock) <= 5 && { label: 'Sắp hết hàng', tone: 'warn' },
+                  !p.features?.length && { label: 'Thiếu tính năng', tone: 'warn' },
+                  p.status === 'used' && { label: 'Xe cũ', tone: 'muted' }
+                ]} />
+              </td>
               <td><div className="actions">
                 <button title="Xem"><Icon name="eye" size={14} /></button>
                 <button title="Sửa" onClick={()=>openModal('product', p)}><Icon name="edit" size={14} /></button>
@@ -179,13 +255,30 @@ const AdminProducts = ({ openModal }) => {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 };
 
 const AdminNews = ({ openModal }) => {
   const D = window.DTC_DATA;
+  const [query, setQuery] = useState('');
+  const [cat, setCat] = useState('all');
+  const [quality, setQuality] = useState('all');
   const [, force] = useState(0);
+  const cats = Array.from(new Set(D.news.map(n => n.cat))).filter(Boolean);
+  const normalizedQuery = query.trim().toLowerCase();
+  const list = D.news.filter(n => {
+    const byQuery = !normalizedQuery || [n.title, n.excerpt, n.author, n.cat].join(' ').toLowerCase().includes(normalizedQuery);
+    const byCat = cat === 'all' || n.cat === cat;
+    const byQuality = quality === 'all'
+      || (quality === 'missing-cover' && !n.cover)
+      || (quality === 'missing-excerpt' && !n.excerpt)
+      || (quality === 'ready' && n.cover && n.excerpt);
+    return byQuery && byCat && byQuality;
+  });
+  const missingCover = D.news.filter(n => !n.cover).length;
+  const missingExcerpt = D.news.filter(n => !n.excerpt).length;
 
   const remove = async (n) => {
     if (!confirm(`Ẩn bài "${n.title}" khỏi website?`)) return;
@@ -200,15 +293,45 @@ const AdminNews = ({ openModal }) => {
   };
 
   return (
-    <div className="page-fade admin-card">
-      <div className="admin-card-head">
-        <h3>Tin tức & Khuyến mãi ({D.news.length})</h3>
-        <button className="btn btn-primary" onClick={()=>openModal('news')}><Icon name="plus" size={14} />Đăng bài mới</button>
-      </div>
+    <div className="page-fade admin-content-stack">
+      <AdminMetricStrip items={[
+        { label: 'Tổng bài viết', value: D.news.length },
+        { label: 'Chuyên mục', value: cats.length },
+        { label: 'Thiếu ảnh bìa', value: missingCover, tone: missingCover ? 'danger' : 'ok' },
+        { label: 'Thiếu tóm tắt', value: missingExcerpt, tone: missingExcerpt ? 'warn' : 'ok' }
+      ]} />
+
+      <div className="admin-card">
+        <div className="admin-card-head content-head">
+          <div>
+            <h3>Tin tức & Khuyến mãi ({list.length})</h3>
+            <p>Biên tập nội dung, lọc nhanh theo chuyên mục và phát hiện bài thiếu dữ liệu.</p>
+          </div>
+          <button className="btn btn-primary" onClick={()=>openModal('news')}><Icon name="plus" size={14} />Đăng bài mới</button>
+        </div>
+        <div className="content-toolbar">
+          <div className="admin-search-field">
+            <Icon name="search" size={14} />
+            <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm tiêu đề, tác giả, tóm tắt..." />
+          </div>
+          <select className="select" value={cat} onChange={e=>setCat(e.target.value)}>
+            <option value="all">Tất cả chuyên mục</option>
+            {cats.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select className="select" value={quality} onChange={e=>setQuality(e.target.value)}>
+            <option value="all">Tất cả chất lượng</option>
+            <option value="ready">Sẵn sàng</option>
+            <option value="missing-cover">Thiếu ảnh bìa</option>
+            <option value="missing-excerpt">Thiếu tóm tắt</option>
+          </select>
+        </div>
       <table className="admin-table">
-        <thead><tr><th></th><th>Tiêu đề</th><th>Chuyên mục</th><th>Tác giả</th><th>Ngày đăng</th><th></th></tr></thead>
+        <thead><tr><th></th><th>Tiêu đề</th><th>Chuyên mục</th><th>Tác giả</th><th>Ngày đăng</th><th>Chất lượng</th><th></th></tr></thead>
         <tbody>
-          {D.news.map(n => (
+          {list.length === 0 && (
+            <tr><td colSpan={7} className="admin-empty-cell">Không tìm thấy bài viết phù hợp bộ lọc.</td></tr>
+          )}
+          {list.map(n => (
             <tr key={n.id}>
               <td style={{width:60}}>
                 <div style={{width:48, height:36, borderRadius:6, background:'var(--bg-3)',
@@ -218,6 +341,13 @@ const AdminNews = ({ openModal }) => {
               <td><span className="badge badge-new">{n.cat}</span></td>
               <td style={{fontSize:13, color:'var(--fg-2)'}}>{n.author}</td>
               <td style={{fontFamily:'var(--font-mono)', fontSize:12}}>{n.date}</td>
+              <td>
+                <QualityTags items={[
+                  !n.cover && { label: 'Thiếu ảnh bìa', tone: 'danger' },
+                  !n.excerpt && { label: 'Thiếu tóm tắt', tone: 'warn' },
+                  !n.content && { label: 'Thiếu nội dung', tone: 'warn' }
+                ]} />
+              </td>
               <td><div className="actions">
                 <button onClick={()=>openModal('news', n)}><Icon name="edit" size={14} /></button>
                 <button onClick={()=>remove(n)}><Icon name="trash" size={14} /></button>
@@ -226,6 +356,7 @@ const AdminNews = ({ openModal }) => {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 };
@@ -507,6 +638,11 @@ const ProductModal = ({ data, close }) => {
     }
   };
 
+  const previewFeatures = form.features.split('\n').map(s => s.trim()).filter(Boolean);
+  const selectedCategory = D.categories.find(c => c.id === form.cat)?.vi || form.cat;
+  const selectedStore = D.stores.find(s => String(s.id) === String(form.store_id));
+  const stockNumber = Number(form.stock) || 0;
+
   return (
   <div className="modal-overlay" onClick={close}>
     <div className="modal" onClick={(e)=>e.stopPropagation()}>
@@ -516,6 +652,32 @@ const ProductModal = ({ data, close }) => {
       </div>
       <div className="modal-body">
         {err && <div style={{padding:'10px 14px', marginBottom:12, background:'rgba(200,16,46,0.1)', color:'var(--crimson)', borderRadius:8, fontSize:13}}>{err}</div>}
+        <div className="editor-live-preview product-preview">
+          <div className="elp-media" style={form.image_url ? {backgroundImage:`url(${form.image_url})`} : null}>
+            {!form.image_url && <Icon name="box" size={30} />}
+          </div>
+          <div className="elp-body">
+            <div className="elp-label">Preview sản phẩm</div>
+            <h4>{form.name.trim() || 'Tên xe sẽ hiển thị tại đây'}</h4>
+            <div className="elp-meta-row">
+              <span>{form.brand}</span>
+              <span>{selectedCategory}</span>
+              <span>{form.year || 'Năm SX'}</span>
+              <span>{form.color || 'Chưa có màu'}</span>
+            </div>
+            <div className="elp-price">{form.price ? window.formatVND(Number(form.price)) : 'Chưa nhập giá'}</div>
+            <QualityTags items={[
+              !form.name.trim() && { label: 'Thiếu tên', tone: 'danger' },
+              !form.price && { label: 'Thiếu giá', tone: 'danger' },
+              !form.image_url && { label: 'Thiếu ảnh', tone: 'warn' },
+              stockNumber <= 5 && { label: 'Sắp hết hàng', tone: 'warn' },
+              !previewFeatures.length && { label: 'Thiếu tính năng', tone: 'warn' }
+            ]} />
+            <div className="elp-note">
+              {selectedStore ? selectedStore.name : 'Chưa gán chi nhánh'} · {previewFeatures.length || 0} tính năng
+            </div>
+          </div>
+        </div>
         <div className="form-row full"><div><label className="label">Tên xe *</label>
           <input className="input" placeholder="VD: Honda SH 350i ABS" value={form.name} onChange={e=>upd('name', e.target.value)} /></div></div>
         <div className="form-row">
@@ -672,6 +834,9 @@ const NewsModal = ({ data, close, onSaved }) => {
     }
   };
 
+  const excerptLength = form.excerpt.trim().length;
+  const contentLength = form.content.trim().length;
+
   return (
   <div className="modal-overlay" onClick={close}>
     <div className="modal" onClick={(e)=>e.stopPropagation()}>
@@ -681,6 +846,24 @@ const NewsModal = ({ data, close, onSaved }) => {
       </div>
       <div className="modal-body">
         {err && <div style={{padding:'10px 14px', marginBottom:12, background:'rgba(200,16,46,0.1)', color:'var(--crimson)', borderRadius:8, fontSize:13}}>{err}</div>}
+        <div className="editor-live-preview news-preview">
+          <div className="elp-media wide" style={form.cover_url ? {backgroundImage:`url(${form.cover_url})`} : null}>
+            {!form.cover_url && <Icon name="edit" size={28} />}
+          </div>
+          <div className="elp-body">
+            <div className="elp-label">Preview bài viết</div>
+            <div className="elp-meta-row"><span>{form.cat}</span><span>{form.author || 'Tác giả'}</span><span>{form.published ? 'Công khai' : 'Bản nháp'}</span></div>
+            <h4>{form.title.trim() || 'Tiêu đề bài viết sẽ hiển thị tại đây'}</h4>
+            <p>{form.excerpt.trim() || 'Phần tóm tắt giúp bài viết rõ hơn ở danh sách tin tức.'}</p>
+            <QualityTags items={[
+              !form.title.trim() && { label: 'Thiếu tiêu đề', tone: 'danger' },
+              !form.cover_url && { label: 'Thiếu ảnh bìa', tone: 'warn' },
+              excerptLength < 60 && { label: 'Tóm tắt ngắn', tone: 'warn' },
+              contentLength < 160 && { label: 'Nội dung ngắn', tone: 'warn' },
+              !form.published && { label: 'Đang lưu nháp', tone: 'muted' }
+            ]} />
+          </div>
+        </div>
 
         <div className="form-row full"><div><label className="label">Tiêu đề *</label>
           <input className="input" value={form.title} onChange={e=>upd('title', e.target.value)} placeholder="Tiêu đề hấp dẫn..." /></div></div>
